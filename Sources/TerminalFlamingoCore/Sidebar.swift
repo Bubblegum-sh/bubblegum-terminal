@@ -16,7 +16,7 @@ public enum SidebarItem: Equatable, Identifiable {
 }
 
 public enum SidebarLayout {
-    /// L-1 groups (Pinned, Sessions · N, Archived · N), or F-1 results when a query is set.
+    /// L-1 groups (Sessions · N, Archived · N), or F-1 results when a query is set.
     /// Order inside groups is the order of `sessions` (creation order, L-8).
     public static func items(sessions: [Session], query: String, archivedOpen: Bool) -> [SidebarItem] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -27,17 +27,11 @@ public enum SidebarLayout {
             return items
         }
 
-        let pinned = sessions.filter { $0.isPinned && !$0.isArchived }
-        let rest = sessions.filter { !$0.isPinned && !$0.isArchived }
+        let active = sessions.filter { !$0.isArchived }
         let archived = sessions.filter { $0.isArchived }
 
-        var items: [SidebarItem] = []
-        if !pinned.isEmpty {
-            items.append(.label("Pinned"))
-            items += pinned.map { .row($0.id) }
-        }
-        items.append(.label("Sessions · \(rest.count)"))
-        items += rest.map { .row($0.id) }
+        var items: [SidebarItem] = [.label("Sessions · \(active.count)")]
+        items += active.map { .row($0.id) }
         if !archived.isEmpty {
             items.append(.archivedToggle(count: archived.count, isOpen: archivedOpen))
             if archivedOpen { items += archived.map { .row($0.id) } }

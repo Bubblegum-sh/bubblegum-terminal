@@ -186,14 +186,14 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 }
 
 @Suite struct SidebarTests {
-    let a = Session(name: "Terminal Flamingo", directory: "/code/tf", isPinned: true)
+    let a = Session(name: "Terminal Flamingo", directory: "/code/tf")
     let b = Session(name: "Parser refactor", directory: "/code/parser")
     let c = Session(name: "Landing page", directory: "/code/landing")
     let d = Session(name: "Rust experiment", directory: "/code/rust", isArchived: true)
 
     @Test func groups() {
         let items = SidebarLayout.items(sessions: [a, b, c, d], query: "", archivedOpen: true)
-        #expect(items == [.label("Pinned"), .row(a.id), .label("Sessions · 2"), .row(b.id), .row(c.id), .archivedToggle(count: 1, isOpen: true), .row(d.id)])
+        #expect(items == [.label("Sessions · 3"), .row(a.id), .row(b.id), .row(c.id), .archivedToggle(count: 1, isOpen: true), .row(d.id)])
         let closed = SidebarLayout.items(sessions: [b], query: "", archivedOpen: false)
         #expect(closed == [.label("Sessions · 1"), .row(b.id)])
     }
@@ -262,7 +262,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     }
 
     @Test func persistenceRoundTripDropsRuntimeFields() throws {
-        var s = Session(name: "x", directory: "/x", claudeSessionId: "c", isPinned: true, status: .working)
+        var s = Session(name: "x", directory: "/x", claudeSessionId: "c", isArchived: true, status: .working)
         s.terminalTitle = "title"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("tf-\(UUID()).json")
         try PersistedState(sessions: [s], selectedId: s.id, archivedOpen: false).save(to: url)
@@ -270,9 +270,19 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(loaded.sessions[0].status == .paused)
         #expect(loaded.sessions[0].terminalTitle == nil)
         #expect(loaded.sessions[0].claudeSessionId == "c")
-        #expect(loaded.sessions[0].isPinned)
+        #expect(loaded.sessions[0].isArchived)
         #expect(loaded.selectedId == s.id)
         #expect(!loaded.archivedOpen)
+    }
+
+    @Test func loadsSessionsSavedWithPinnedFlag() throws {
+        let id = UUID()
+        let legacy = #"{"archivedOpen":true,"sessions":[{"id":"\#(id.uuidString)","name":"api","directory":"/code/api","isPinned":true,"isArchived":false,"createdAt":"2026-11-26T10:00:00Z","lastActivity":"2026-11-26T10:00:00Z","unread":false}]}"#
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("tf-legacy-\(UUID()).json")
+        try Data(legacy.utf8).write(to: url)
+        let loaded = try #require(PersistedState.load(from: url))
+        #expect(loaded.sessions.map(\.id) == [id])
+        #expect(SidebarLayout.items(sessions: loaded.sessions, query: "", archivedOpen: true) == [.label("Sessions · 1"), .row(id)])
     }
 
     @Test func titleCleanup() {

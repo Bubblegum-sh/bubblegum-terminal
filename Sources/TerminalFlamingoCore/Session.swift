@@ -40,7 +40,6 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
     public var name: String
     public var directory: String
     public var claudeSessionId: String?
-    public var isPinned: Bool
     public var isArchived: Bool
     public var createdAt: Date
     public var lastActivity: Date
@@ -54,7 +53,8 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
     public var claudeNotFound: Bool = false
 
     enum CodingKeys: String, CodingKey {
-        case id, name, directory, claudeSessionId, isPinned, isArchived, createdAt, lastActivity, unread
+        // Files written before pinning was removed may still contain "isPinned"; it is ignored.
+        case id, name, directory, claudeSessionId, isArchived, createdAt, lastActivity, unread
     }
 
     public init(
@@ -62,7 +62,6 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
         name: String,
         directory: String,
         claudeSessionId: String? = nil,
-        isPinned: Bool = false,
         isArchived: Bool = false,
         createdAt: Date = Date(),
         lastActivity: Date? = nil,
@@ -73,7 +72,6 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
         self.name = name
         self.directory = directory
         self.claudeSessionId = claudeSessionId
-        self.isPinned = isPinned
         self.isArchived = isArchived
         self.createdAt = createdAt
         self.lastActivity = lastActivity ?? createdAt

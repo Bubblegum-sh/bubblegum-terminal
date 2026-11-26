@@ -47,21 +47,11 @@ struct SessionRow: View {
         HStack(spacing: 10) {
             StatusDot(status: session.status)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text(session.name)
-                        .font(TFFont.rowName)
-                        .foregroundStyle(theme.text1)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    if session.isPinned {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(theme.text3)
-                            .rotationEffect(.degrees(45))
-                            .help("Pinned")
-                            .accessibilityLabel("Pinned")
-                    }
-                }
+                Text(session.name)
+                    .font(TFFont.rowName)
+                    .foregroundStyle(theme.text1)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 Text(session.subtitle)
                     .font(TFFont.subtitle)
                     .foregroundStyle(theme.text2)
@@ -97,14 +87,6 @@ struct SessionRow: View {
                     store.toggleArchive(session.id)
                 }
             } else {
-                IconButton(
-                    systemImage: session.isPinned ? "pin.fill" : "pin",
-                    label: session.isPinned ? "Unpin (⇧⌘P)" : "Pin to top (⇧⌘P)",
-                    tint: session.isPinned ? theme.accentC : nil,
-                    size: 12
-                ) {
-                    store.togglePin(session.id)
-                }
                 IconButton(systemImage: "archivebox", label: "Archive (⇧⌘A)") {
                     store.toggleArchive(session.id)
                 }
@@ -144,7 +126,6 @@ struct SessionRow: View {
             Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
         } else {
             Button("Rename…") { store.beginRename(session.id) }
-            Button(session.isPinned ? "Unpin" : "Pin to Top") { store.togglePin(session.id) }
             Button("Archive") { store.toggleArchive(session.id) }
             Divider()
             Button("Restart Session") { store.requestRestart(session.id) }
@@ -154,7 +135,6 @@ struct SessionRow: View {
 
     private var accessibilityText: String {
         var parts = [session.name, session.status.label, session.subtitle]
-        if session.isPinned { parts.append("pinned") }
         if session.unread { parts.append("unread") }
         return parts.joined(separator: ", ")
     }

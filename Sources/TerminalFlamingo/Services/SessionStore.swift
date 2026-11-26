@@ -3,7 +3,7 @@ import Combine
 import SwiftUI
 import TerminalFlamingoCore
 
-/// Source of truth for sessions, selection, search and pin/archive state.
+/// Source of truth for sessions, selection, search and archive state.
 @MainActor
 final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [Session] = [] {
@@ -243,21 +243,12 @@ final class SessionStore: ObservableObject {
         persist()
     }
 
-    // MARK: Pin / archive / rename
+    // MARK: Archive / rename
 
-    func togglePin(_ id: UUID? = nil) {
-        guard let id = id ?? selectedId, let s = session(id), !s.isArchived else { return }
-        mutate(id) { $0.isPinned.toggle() }
-        persist()
-    }
-
-    /// L-6: archiving unpins; a running process keeps running.
+    /// L-6: a running process keeps running.
     func toggleArchive(_ id: UUID? = nil) {
         guard let id = id ?? selectedId else { return }
-        mutate(id) {
-            $0.isArchived.toggle()
-            $0.isPinned = false
-        }
+        mutate(id) { $0.isArchived.toggle() }
         if session(id)?.isArchived == true { archivedOpen = true }
         persist()
     }
