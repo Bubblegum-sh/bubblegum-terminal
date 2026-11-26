@@ -29,6 +29,9 @@ enum DebugSnapshot {
                     let h = NSColor.selectedContentBackgroundColor.usingColorSpace(.sRGB)!
                     let hex = { (c: NSColor) in String(format: "#%02X%02X%02X", Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255)) }
                     try? "accent=\(hex(c)) selection=\(hex(h))".write(toFile: "\(prefix)-accent.txt", atomically: true, encoding: .utf8)
+                case "fullscreen", "windowed":
+                    NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 600 })?.toggleFullScreen(nil)
+                    try? await Task.sleep(for: .seconds(5))
                 case "askdelete": if let id = store.selectedId { store.requestDelete(id) }
                 case "delete": if let id = store.confirmDeleteId ?? store.selectedId { store.delete(id) }
                 case "hittest": hitTest(to: "\(prefix)-hits.txt")

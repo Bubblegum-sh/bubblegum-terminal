@@ -90,6 +90,8 @@ struct ContentView: View {
 /// detail header, as on the Main window artboard.
 struct WindowChrome: NSViewRepresentable {
     final class ChromeView: NSView {
+        private var observers: [NSObjectProtocol] = []
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard let window, window.toolbar == nil else { return }
@@ -102,6 +104,24 @@ struct WindowChrome: NSViewRepresentable {
             window.titlebarAppearsTransparent = true
             window.titlebarSeparatorStyle = .none
             window.styleMask.insert(.fullSizeContentView)
+
+            // In full screen macOS draws the toolbar as an opaque band above the content,
+            // covering our top row and header. There are no traffic lights to align with
+            // there, so hide it while in full screen.
+            let center = NotificationCenter.default
+            observers = [
+                center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                    window?.toolbar?.isVisible = false
+                },
+                center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                    window?.toolbar?.isVisible = true
+                },
+            ]
+            toolbar.isVisible = !window.styleMask.contains(.fullScreen)
+        }
+
+        deinit {
+            observers.forEach(NotificationCenter.default.removeObserver)
         }
     }
 
