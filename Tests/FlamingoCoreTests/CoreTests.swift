@@ -597,3 +597,14 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(ClaudeTranscripts.url(sessionId: "s2", in: projects) == nil)
     }
 }
+
+@Suite struct VersionTests {
+    @Test func infoPlistMatchesAppVersion() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("Resources/Info.plist"))
+        let plist = try #require(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+        #expect(AppVersion.version == "0.1.0")
+        #expect(plist["CFBundleShortVersionString"] as? String == AppVersion.version)
+        #expect(plist["CFBundleVersion"] as? String == AppVersion.build)
+    }
+}

@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Needed when run as a bare executable (`swift run`); a no-op inside the .app bundle.
         NSApp.setActivationPolicy(.regular)
+        // Without a bundle (e.g. Run in Xcode) there is no AppIcon; use the drawn one for the Dock.
+        if Bundle.main.bundleURL.pathExtension != "app" { NSApp.applicationIconImage = FlamingoIcon.image(size: 512) }
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 

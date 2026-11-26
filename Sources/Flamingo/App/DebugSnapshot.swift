@@ -45,6 +45,18 @@ enum DebugSnapshot {
                             try? md.write(toFile: "\(prefix)-export.md", atomically: true, encoding: .utf8)
                         }
                     }
+                case "about":
+                    About.show()
+                    try? await Task.sleep(for: .seconds(1))
+                    if let panel = NSApp.windows.first(where: { $0.isVisible && $0 is NSPanel && !String(describing: type(of: $0)).contains("Menu") && $0.frame.width > 150 }),
+                       let view = panel.contentView?.superview, let layer = view.layer {
+                        let sc = panel.backingScaleFactor, sz = view.bounds.size
+                        if let ctx = CGContext(data: nil, width: Int(sz.width * sc), height: Int(sz.height * sc), bitsPerComponent: 8, bytesPerRow: 0,
+                                               space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+                            ctx.scaleBy(x: sc, y: sc); layer.render(in: ctx)
+                            if let img = ctx.makeImage() { try? NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(prefix)-aboutpanel.png")) }
+                        }
+                    }
                 case "askdelete": if let id = store.selectedId { store.requestDelete(id) }
                 case "delete": if let id = store.confirmDeleteId ?? store.selectedId { store.delete(id) }
                 case "hittest": hitTest(to: "\(prefix)-hits.txt")

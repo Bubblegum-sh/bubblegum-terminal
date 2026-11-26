@@ -25,6 +25,10 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/Flamingo" "$APP/Contents/MacOS/Flamingo"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# Version comes from Sources/FlamingoCore/AppVersion.swift (single source).
+VERSION="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/FlamingoCore/AppVersion.swift)"
+BUILD="$(sed -n 's/.*static let build = "\(.*\)".*/\1/p' Sources/FlamingoCore/AppVersion.swift)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 
 # Asset catalog (AppIcon + AccentColor, the brand pink used by system buttons).
 if xcrun --find actool >/dev/null 2>&1; then

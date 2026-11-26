@@ -7,6 +7,10 @@ struct AppCommands: Commands {
     @ObservedObject var settings: AppSettings
 
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Flamingo") { About.show() }
+        }
+
         CommandGroup(replacing: .newItem) {
             Button("New Session…") { store.showNewSessionSheet() }
                 .keyboardShortcut("t", modifiers: .command)
