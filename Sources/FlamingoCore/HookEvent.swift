@@ -1,6 +1,7 @@
 import Foundation
 
-/// One event written by `hook.sh`: `{"tf": "<TF_SESSION_ID>", "payload": <Claude Code hook JSON>}`.
+/// One event written by `hook.sh`: `{"flamingo": "<FLAMINGO_SESSION_ID>", "payload": <Claude Code hook JSON>}`.
+/// Files from before the rename use the key `"tf"`; both are accepted.
 public struct HookEvent: Equatable, Sendable {
     public enum Kind: String, Sendable {
         case sessionStart = "SessionStart"
@@ -28,8 +29,8 @@ public struct HookEvent: Equatable, Sendable {
     /// Parses an event file. Returns nil for malformed files or a missing/invalid `tf` id.
     public static func parse(_ data: Data) -> HookEvent? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tf = obj["tf"] as? String,
-              let id = UUID(uuidString: tf) else { return nil }
+              let raw = (obj["flamingo"] ?? obj["tf"]) as? String,
+              let id = UUID(uuidString: raw) else { return nil }
         let payload = obj["payload"] as? [String: Any] ?? [:]
         let name = payload["hook_event_name"] as? String
         let sid = (payload["session_id"] as? String).flatMap { $0.isEmpty ? nil : $0 }

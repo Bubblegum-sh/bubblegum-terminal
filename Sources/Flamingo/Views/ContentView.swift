@@ -1,5 +1,5 @@
 import SwiftUI
-import TerminalFlamingoCore
+import FlamingoCore
 
 /// Main window: fixed-width sidebar + detail, content under the (hidden) title bar.
 struct ContentView: View {
@@ -64,7 +64,7 @@ struct ContentView: View {
 
     /// S-8: the confirmation says when a running claude process will be stopped.
     private var deleteMessage: String {
-        let base = "The session is removed from Terminal Flamingo. Claude’s transcript on disk is not touched."
+        let base = "The session is removed from Flamingo. Claude’s transcript on disk is not touched."
         guard let id = store.confirmDeleteId, store.terminals.isRunning(id) else { return base }
         let working = store.session(id)?.status == .working
         return (working ? "Claude is working. " : "") + "Its claude process will be stopped. " + base
@@ -93,7 +93,7 @@ struct WindowChrome: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard let window, window.toolbar == nil else { return }
-            let toolbar = NSToolbar(identifier: "TerminalFlamingoMain")
+            let toolbar = NSToolbar(identifier: "FlamingoMain")
             toolbar.displayMode = .iconOnly
             toolbar.allowsUserCustomization = false
             window.toolbar = toolbar

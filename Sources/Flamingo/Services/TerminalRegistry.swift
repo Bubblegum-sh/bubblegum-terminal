@@ -1,6 +1,6 @@
 import AppKit
 import SwiftTerm
-import TerminalFlamingoCore
+import FlamingoCore
 
 /// Terminal view with file drag-and-drop (T-5).
 final class TFTerminalView: LocalProcessTerminalView {

@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import TerminalFlamingoCore
+import FlamingoCore
 
 struct SessionDetailView: View {
     @EnvironmentObject private var store: SessionStore

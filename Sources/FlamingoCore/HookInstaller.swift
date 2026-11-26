@@ -5,25 +5,32 @@ public struct AppPaths: Sendable {
     public var supportDirectory: URL
     public var claudeDirectory: URL
 
-    public init(supportDirectory: URL, claudeDirectory: URL) {
+    /// Where the app kept its data before it was renamed from "Terminal Flamingo" (nil for dev paths).
+    public var legacySupportDirectory: URL?
+
+    public init(supportDirectory: URL, claudeDirectory: URL, legacySupportDirectory: URL? = nil) {
         self.supportDirectory = supportDirectory
         self.claudeDirectory = claudeDirectory
+        self.legacySupportDirectory = legacySupportDirectory
     }
 
-    /// The real locations. For development, `TF_SUPPORT_DIR` overrides the app's own folder;
-    /// Claude's folder then defaults to `<TF_SUPPORT_DIR>/claude` (or `TF_CLAUDE_DIR`) so a
+    /// The real locations. For development, `FLAMINGO_SUPPORT_DIR` overrides the app's own folder;
+    /// Claude's folder then defaults to `<FLAMINGO_SUPPORT_DIR>/claude` (or `FLAMINGO_CLAUDE_DIR`) so a
     /// dev run can never write hooks into the real ~/.claude.
     public static var standard: AppPaths {
         standard(environment: ProcessInfo.processInfo.environment)
     }
 
     public static func standard(environment env: [String: String], home: URL = FileManager.default.homeDirectoryForCurrentUser) -> AppPaths {
-        let support = env["TF_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-        let claude = env["TF_CLAUDE_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let support = env["FLAMINGO_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let claude = env["FLAMINGO_CLAUDE_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? support?.appendingPathComponent("claude", isDirectory: true)
         return AppPaths(
-            supportDirectory: support ?? home.appendingPathComponent("Library/Application Support/TerminalFlamingo", isDirectory: true),
-            claudeDirectory: claude ?? home.appendingPathComponent(".claude", isDirectory: true)
+            supportDirectory: support ?? home.appendingPathComponent("Library/Application Support/Flamingo", isDirectory: true),
+            claudeDirectory: claude ?? home.appendingPathComponent(".claude", isDirectory: true),
+            legacySupportDirectory: support == nil
+                ? home.appendingPathComponent("Library/Application Support/TerminalFlamingo", isDirectory: true)
+                : nil
         )
     }
 
@@ -32,7 +39,7 @@ public struct AppPaths: Sendable {
     public var hookScript: URL { supportDirectory.appendingPathComponent("hook.sh") }
     public var eventsDirectory: URL { supportDirectory.appendingPathComponent("events", isDirectory: true) }
     public var claudeSettings: URL { claudeDirectory.appendingPathComponent("settings.json") }
-    public var claudeSettingsBackup: URL { claudeDirectory.appendingPathComponent("settings.json.tf-backup") }
+    public var claudeSettingsBackup: URL { claudeDirectory.appendingPathComponent("settings.json.flamingo-backup") }
 }
 
 public enum HookInstallError: LocalizedError, Equatable {
@@ -56,17 +63,17 @@ public enum HookInstallError: LocalizedError, Equatable {
 public struct HookInstaller: Sendable {
     public static let events = ["SessionStart", "UserPromptSubmit", "Notification", "Stop"]
     /// Substring identifying our entries in settings.json.
-    public static let marker = "TerminalFlamingo/hook.sh"
+    public static let marker = "Flamingo/hook.sh"
 
     public static let script = """
     #!/bin/sh
-    [ -n "$TF_SESSION_ID" ] || exit 0
-    DIR="$HOME/Library/Application Support/TerminalFlamingo/events"
+    [ -n "$FLAMINGO_SESSION_ID" ] || exit 0
+    DIR="$HOME/Library/Application Support/Flamingo/events"
     mkdir -p "$DIR" || exit 0
     PAYLOAD=$(cat)
     [ -n "$PAYLOAD" ] || PAYLOAD=null
     TMP="$DIR/.$$.tmp"
-    printf '{"tf":"%s","payload":%s}\\n' "$TF_SESSION_ID" "$PAYLOAD" > "$TMP" && mv "$TMP" "$DIR/$(date +%s)-$$.json"
+    printf '{"flamingo":"%s","payload":%s}\\n' "$FLAMINGO_SESSION_ID" "$PAYLOAD" > "$TMP" && mv "$TMP" "$DIR/$(date +%s)-$$.json"
     exit 0
 
     """
@@ -91,17 +98,36 @@ public struct HookInstaller: Sendable {
         return Self.containsAllEntries(obj, command: hookCommand)
     }
 
-    static func containsAllEntries(_ settings: [String: Any], command: String? = nil) -> Bool {
-        guard let hooks = settings["hooks"] as? [String: Any] else { return false }
-        return events.allSatisfy { event in
-            guard let groups = hooks[event] as? [[String: Any]] else { return false }
-            return groups.contains { group in
-                (group["hooks"] as? [[String: Any]] ?? []).contains { isOurs($0, command: command) }
+    /// True when settings.json still has entries for a hook script that is not this install's
+    /// (e.g. the pre-rename `…/TerminalFlamingo/hook.sh`), so they need rewriting.
+    public func hasStaleEntries() -> Bool {
+        guard let data = try? Data(contentsOf: paths.claudeSettings),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hooks = obj["hooks"] as? [String: Any] else { return false }
+        let command = hookCommand
+        return hooks.values.contains { value in
+            (value as? [[String: Any]] ?? []).contains { group in
+                (group["hooks"] as? [[String: Any]] ?? []).contains { h in
+                    Self.isOurs(h, command: command) && (h["command"] as? String) != command
+                }
             }
         }
     }
 
-    /// Our entry: the command contains the standard marker, or is exactly this install's command.
+    /// Installed means every event has an entry with exactly this install's command
+    /// (an entry for an old script path does not count).
+    static func containsAllEntries(_ settings: [String: Any], command: String) -> Bool {
+        guard let hooks = settings["hooks"] as? [String: Any] else { return false }
+        return events.allSatisfy { event in
+            guard let groups = hooks[event] as? [[String: Any]] else { return false }
+            return groups.contains { group in
+                (group["hooks"] as? [[String: Any]] ?? []).contains { ($0["command"] as? String) == command }
+            }
+        }
+    }
+
+    /// Our entry: the command contains the marker (this also matches the pre-rename
+    /// `TerminalFlamingo/hook.sh`), or is exactly this install's command.
     static func isOurs(_ hook: [String: Any], command: String? = nil) -> Bool {
         guard let c = hook["command"] as? String else { return false }
         return c.contains(marker) || (command != nil && c == command)

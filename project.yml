@@ -1,8 +1,8 @@
-# XcodeGen spec: `xcodegen generate` creates TerminalFlamingo.xcodeproj.
+# XcodeGen spec: `xcodegen generate` creates Flamingo.xcodeproj.
 # SwiftPM (Package.swift + scripts/build-app.sh) builds the same sources without Xcode projects.
-name: TerminalFlamingo
+name: Flamingo
 options:
-  bundleIdPrefix: dev.terminalflamingo
+  bundleIdPrefix: dev.flamingo
   deploymentTarget:
     macOS: "14.0"
 packages:
@@ -14,36 +14,36 @@ settings:
     SWIFT_VERSION: "5.10"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 targets:
-  TerminalFlamingoCore:
+  FlamingoCore:
     type: framework
     platform: macOS
-    sources: [Sources/TerminalFlamingoCore]
+    sources: [Sources/FlamingoCore]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.terminalflamingo.core
+        PRODUCT_BUNDLE_IDENTIFIER: dev.flamingo.core
         GENERATE_INFOPLIST_FILE: YES
-  TerminalFlamingo:
+  Flamingo:
     type: application
     platform: macOS
     sources:
-      - Sources/TerminalFlamingo
+      - Sources/Flamingo
       - Resources/Assets.xcassets
     dependencies:
-      - target: TerminalFlamingoCore
+      - target: FlamingoCore
       - package: SwiftTerm
     settings:
       base:
-        PRODUCT_NAME: Terminal Flamingo
-        PRODUCT_BUNDLE_IDENTIFIER: dev.terminalflamingo.app
+        PRODUCT_NAME: Flamingo
+        PRODUCT_BUNDLE_IDENTIFIER: dev.flamingo.app
         INFOPLIST_FILE: Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_IDENTITY: "-"
-  TerminalFlamingoCoreTests:
+  FlamingoCoreTests:
     type: bundle.unit-test
     platform: macOS
-    sources: [Tests/TerminalFlamingoCoreTests]
+    sources: [Tests/FlamingoCoreTests]
     dependencies:
-      - target: TerminalFlamingoCore
+      - target: FlamingoCore

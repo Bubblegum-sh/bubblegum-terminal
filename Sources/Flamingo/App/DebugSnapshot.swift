@@ -1,14 +1,14 @@
 #if DEBUG
 import AppKit
 
-/// Development aid: `TF_SNAPSHOT=/path/prefix` writes PNGs of the main window
-/// (optionally after toggling UI via `TF_SNAPSHOT_STEPS`), then quits.
+/// Development aid: `FLAMINGO_SNAPSHOT=/path/prefix` writes PNGs of the main window
+/// (optionally after toggling UI via `FLAMINGO_SNAPSHOT_STEPS`), then quits.
 @MainActor
 enum DebugSnapshot {
     static func runIfRequested(store: SessionStore, settings: AppSettings) {
         let env = ProcessInfo.processInfo.environment
-        guard let prefix = env["TF_SNAPSHOT"] else { return }
-        let steps = (env["TF_SNAPSHOT_STEPS"] ?? "main").split(separator: ",").map(String.init)
+        guard let prefix = env["FLAMINGO_SNAPSHOT"] else { return }
+        let steps = (env["FLAMINGO_SNAPSHOT_STEPS"] ?? "main").split(separator: ",").map(String.init)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(6))
             for step in steps {

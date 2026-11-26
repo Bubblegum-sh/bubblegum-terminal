@@ -1,5 +1,5 @@
 import AppKit
-import TerminalFlamingoCore
+import FlamingoCore
 import UserNotifications
 
 /// macOS notification banners and the Dock badge (N-3, N-4, N-5).

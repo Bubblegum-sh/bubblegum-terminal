@@ -2,11 +2,11 @@ import AppKit
 import SwiftUI
 
 @main
-struct TerminalFlamingoApp: App {
+struct FlamingoApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        Window("Terminal Flamingo", id: "main") {
+        Window("Flamingo", id: "main") {
             ContentView()
                 .environmentObject(appDelegate.store)
                 .environmentObject(appDelegate.settings)

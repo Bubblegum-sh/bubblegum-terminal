@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import TerminalFlamingoCore
+import FlamingoCore
 
 /// Named design tokens (spec section 8). Views use these, never raw hex values.
 struct Theme: Equatable {

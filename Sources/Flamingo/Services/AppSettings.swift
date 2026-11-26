@@ -37,9 +37,25 @@ final class AppSettings: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        Self.migrateLegacyDefaults(into: defaults)
         appearance = AppAppearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .dark
         let stored = defaults.integer(forKey: Keys.fontSize)
         fontSize = Self.fontRange.contains(stored) ? stored : Self.defaultFontSize
+    }
+
+    /// The app used to be "Terminal Flamingo": bundle id dev.terminalflamingo.app, or the domain
+    /// "TerminalFlamingo" when run as a bare executable (e.g. from Xcode). Copy its preferences
+    /// once so theme, font size and the hook-sheet flag carry over.
+    private static func migrateLegacyDefaults(into defaults: UserDefaults) {
+        let done = "migratedFromTerminalFlamingo"
+        guard !defaults.bool(forKey: done) else { return }
+        for domain in ["dev.terminalflamingo.app", "TerminalFlamingo"] {
+            guard let old = UserDefaults(suiteName: domain) else { continue }
+            for key in [Keys.appearance, Keys.fontSize, "didOfferHookInstall"] where defaults.object(forKey: key) == nil {
+                if let value = old.object(forKey: key) { defaults.set(value, forKey: key) }
+            }
+        }
+        defaults.set(true, forKey: done)
     }
 
     func increaseFont() { fontSize = min(fontSize + 1, Self.fontRange.upperBound) }

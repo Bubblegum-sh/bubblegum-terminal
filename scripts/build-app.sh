@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds "build/Terminal Flamingo.app" with SwiftPM and signs it ad-hoc.
+# Builds "build/Flamingo.app" with SwiftPM and signs it ad-hoc.
 # Usage: scripts/build-app.sh [debug|release]   (default: release)
 set -eu
 
@@ -20,10 +20,10 @@ fi
 swift build -c "$CONFIG" --arch arm64 --arch x86_64 2>/dev/null || swift build -c "$CONFIG"
 BIN="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --show-bin-path 2>/dev/null || swift build -c "$CONFIG" --show-bin-path)"
 
-APP="build/Terminal Flamingo.app"
+APP="build/Flamingo.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/TerminalFlamingo" "$APP/Contents/MacOS/TerminalFlamingo"
+cp "$BIN/Flamingo" "$APP/Contents/MacOS/Flamingo"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
 # Asset catalog (AppIcon + AccentColor, the brand pink used by system buttons).

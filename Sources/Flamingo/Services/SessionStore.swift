@@ -1,7 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
-import TerminalFlamingoCore
+import FlamingoCore
 
 /// Source of truth for sessions, selection, search and archive state.
 @MainActor
@@ -42,6 +42,7 @@ final class SessionStore: ObservableObject {
     init(paths: AppPaths = .standard) {
         self.paths = paths
         self.installer = HookInstaller(paths: paths)
+        LegacyMigration.run(paths: paths) // from "Terminal Flamingo": data folder + hook paths
         if let state = PersistedState.load(from: paths.sessionsFile) {
             sessions = state.sessions.map { var s = $0; s.status = .paused; return s }
             selectedId = state.selectedId.flatMap { id in sessions.contains { $0.id == id } ? id : nil }
@@ -390,14 +391,14 @@ final class SessionStore: ObservableObject {
 
     private func saveRecents() {
         do { try recents.save(to: paths.recentsFile) } catch {
-            NSLog("TerminalFlamingo: could not save recent projects: \(error)")
+            NSLog("Flamingo: could not save recent projects: \(error)")
         }
     }
 
     private func persist() {
         let state = PersistedState(sessions: sessions, selectedId: selectedId, archivedOpen: archivedOpen)
         do { try state.save(to: paths.sessionsFile) } catch {
-            NSLog("TerminalFlamingo: could not save sessions: \(error)")
+            NSLog("Flamingo: could not save sessions: \(error)")
         }
     }
 

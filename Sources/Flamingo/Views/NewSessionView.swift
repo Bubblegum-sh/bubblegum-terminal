@@ -1,5 +1,5 @@
 import SwiftUI
-import TerminalFlamingoCore
+import FlamingoCore
 
 /// S-1: the New session sheet (⌘T / "+"): Open project…, Blank session, Recent projects.
 struct NewSessionView: View {

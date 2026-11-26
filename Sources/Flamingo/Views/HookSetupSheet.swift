@@ -9,14 +9,14 @@ struct HookSetupSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Connect to Claude Code")
                 .font(.system(size: 17, weight: .semibold))
-            Text("Terminal Flamingo learns when a session is working, needs you, or is done through Claude Code’s official hooks. Without them, statuses and notifications won’t update.")
+            Text("Flamingo learns when a session is working, needs you, or is done through Claude Code’s official hooks. Without them, statuses and notifications won’t update.")
                 .font(.system(size: 13))
                 .foregroundStyle(theme.text2)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 6) {
-                Label("Adds a small hook script to Application Support/TerminalFlamingo", systemImage: "doc.badge.plus")
-                Label("Adds four hook entries to ~/.claude/settings.json (backed up to settings.json.tf-backup first)", systemImage: "gearshape.2")
-                Label("The hook does nothing outside Terminal Flamingo sessions", systemImage: "checkmark.shield")
+                Label("Adds a small hook script to Application Support/Flamingo", systemImage: "doc.badge.plus")
+                Label("Adds four hook entries to ~/.claude/settings.json (backed up to settings.json.flamingo-backup first)", systemImage: "gearshape.2")
+                Label("The hook does nothing outside Flamingo sessions", systemImage: "checkmark.shield")
             }
             .font(.system(size: 12))
             .foregroundStyle(theme.text2)

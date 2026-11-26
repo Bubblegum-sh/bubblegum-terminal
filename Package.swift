@@ -2,31 +2,31 @@
 import PackageDescription
 
 let package = Package(
-    name: "TerminalFlamingo",
+    name: "Flamingo",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "TerminalFlamingo", targets: ["TerminalFlamingo"])
+        .executable(name: "Flamingo", targets: ["Flamingo"])
     ],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0")
     ],
     targets: [
         .target(
-            name: "TerminalFlamingoCore",
-            path: "Sources/TerminalFlamingoCore"
+            name: "FlamingoCore",
+            path: "Sources/FlamingoCore"
         ),
         .executableTarget(
-            name: "TerminalFlamingo",
+            name: "Flamingo",
             dependencies: [
-                "TerminalFlamingoCore",
+                "FlamingoCore",
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ],
-            path: "Sources/TerminalFlamingo"
+            path: "Sources/Flamingo"
         ),
         .testTarget(
-            name: "TerminalFlamingoCoreTests",
-            dependencies: ["TerminalFlamingoCore"],
-            path: "Tests/TerminalFlamingoCoreTests"
+            name: "FlamingoCoreTests",
+            dependencies: ["FlamingoCore"],
+            path: "Tests/FlamingoCoreTests"
         )
     ]
 )
