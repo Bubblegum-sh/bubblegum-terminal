@@ -19,12 +19,15 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    @Published var fontSize: Int {
-        didSet {
-            // Assigning inside didSet does not re-trigger the observer.
-            fontSize = min(max(fontSize, Self.fontRange.lowerBound), Self.fontRange.upperBound)
-            defaults.set(fontSize, forKey: Keys.fontSize)
-        }
+    /// Always within `fontRange`: change it through `setFontSize` / increase / decrease / reset.
+    /// (Clamping inside `didSet` would re-enter the `@Published` setter and recurse forever.)
+    @Published private(set) var fontSize: Int {
+        didSet { defaults.set(fontSize, forKey: Keys.fontSize) }
+    }
+
+    func setFontSize(_ size: Int) {
+        let clamped = min(max(size, Self.fontRange.lowerBound), Self.fontRange.upperBound)
+        if clamped != fontSize { fontSize = clamped }
     }
 
     var theme: Theme { Theme.forAppearance(appearance) }
@@ -58,9 +61,9 @@ final class AppSettings: ObservableObject {
         defaults.set(true, forKey: done)
     }
 
-    func increaseFont() { fontSize = min(fontSize + 1, Self.fontRange.upperBound) }
-    func decreaseFont() { fontSize = max(fontSize - 1, Self.fontRange.lowerBound) }
-    func resetFont() { fontSize = Self.defaultFontSize }
+    func increaseFont() { setFontSize(fontSize + 1) }
+    func decreaseFont() { setFontSize(fontSize - 1) }
+    func resetFont() { setFontSize(Self.defaultFontSize) }
 
     /// Menus, alerts and sheets follow the app theme too.
     func applyAppAppearance() {

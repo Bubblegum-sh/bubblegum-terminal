@@ -13,6 +13,8 @@ enum DebugSnapshot {
             try? await Task.sleep(for: .seconds(6))
             for step in steps {
                 switch step {
+                case "bigger": settings.increaseFont()
+                case "smaller": settings.decreaseFont()
                 case "light": settings.appearance = .light
                 case "dark": settings.appearance = .dark
                 case "switcher": store.toggleQuickSwitcher()
