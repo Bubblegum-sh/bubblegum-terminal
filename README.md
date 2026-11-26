@@ -45,3 +45,9 @@ points at the Command Line Tools. For an Xcode project: `xcodegen generate` (use
 - `FLAMINGO_SUPPORT_DIR=/some/dir` uses another folder for sessions/events instead of Application Support;
   "Install hooks" then writes to `/some/dir/claude/settings.json` (or `FLAMINGO_CLAUDE_DIR`), never the real `~/.claude`.
 - `FLAMINGO_SNAPSHOT=/tmp/shot FLAMINGO_SNAPSHOT_STEPS=main,switcher,clear,search,rename,light` renders window snapshots, then quits.
+
+## License
+
+[MIT](LICENSE) © 2026 Eugene Safronov.
+
+Flamingo uses [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT); its license is in its repository.

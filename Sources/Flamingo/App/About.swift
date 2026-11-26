@@ -16,6 +16,7 @@ enum About {
             .version: AppVersion.build,
             .applicationIcon: appIcon,
             .credits: credits,
+            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): AppVersion.copyright,
         ])
         NSApp.activate(ignoringOtherApps: true)
     }

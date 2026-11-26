@@ -606,5 +606,8 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(AppVersion.version == "0.1.0")
         #expect(plist["CFBundleShortVersionString"] as? String == AppVersion.version)
         #expect(plist["CFBundleVersion"] as? String == AppVersion.build)
+        #expect(plist["NSHumanReadableCopyright"] as? String == AppVersion.copyright)
+        let license = try String(contentsOf: root.appendingPathComponent("LICENSE"), encoding: .utf8)
+        #expect(license.hasPrefix("MIT License"))
     }
 }
