@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 import FlamingoCore
 
 /// Source of truth for sessions, selection, search and archive state.
@@ -25,6 +26,7 @@ final class SessionStore: ObservableObject {
     @Published var hooksInstalled = false
     @Published var showHookSheet = false
     @Published var errorMessage: String?
+    @Published var errorTitle = "Something went wrong"
     @Published var confirmRestartId: UUID?
     @Published var confirmDeleteId: UUID?
     /// Incremented to ask the sidebar to focus the search field (⌘F).
@@ -131,7 +133,7 @@ final class SessionStore: ObservableObject {
         guard RecentProjects.directoryExists(path) else {
             recents.prune()
             saveRecents()
-            errorMessage = "\(Session.abbreviate(path)) no longer exists."
+            showError("Project folder not found", "\(Session.abbreviate(path)) no longer exists.")
             return
         }
         createSession(directory: path)
@@ -288,9 +290,41 @@ final class SessionStore: ObservableObject {
         terminalFocusRequest += 1
     }
 
-    func showInFinder(_ id: UUID? = nil) {
+    func showError(_ title: String, _ message: String) {
+        errorTitle = title
+        errorMessage = message
+    }
+
+    // MARK: Export
+
+    /// Saves the session's whole conversation as Markdown (from Claude Code's transcript).
+    func exportSession(_ id: UUID? = nil) {
         guard let s = session(id ?? selectedId) else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: s.directory)])
+        guard let claudeId = s.claudeSessionId, let transcript = ClaudeTranscripts.url(sessionId: claudeId) else {
+            showError("Nothing to export yet", "“\(s.name)” has no saved conversation. Claude Code saves it after the first message.")
+            return
+        }
+        let panel = NSSavePanel()
+        panel.title = "Export Session"
+        panel.message = "Save the whole conversation of “\(s.name)” as Markdown"
+        panel.nameFieldStringValue = TranscriptExporter.suggestedFileName(for: s.name)
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        let metadata = TranscriptExporter.Metadata(title: s.name, directory: s.directory, model: s.modelInfo, claudeSessionId: claudeId)
+        Task.detached(priority: .userInitiated) {
+            do {
+                let data = try Data(contentsOf: transcript)
+                let markdown = TranscriptExporter.markdown(transcript: data, metadata: metadata)
+                try Data(markdown.utf8).write(to: destination, options: .atomic)
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.showError("Couldn’t export “\(metadata.title)”", error.localizedDescription)
+                }
+            }
+        }
     }
 
     // MARK: Navigation
@@ -358,7 +392,7 @@ final class SessionStore: ObservableObject {
             try installer.install()
             showHookSheet = false
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            showError("Couldn’t install hooks", (error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
         refreshHookState()
     }

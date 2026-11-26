@@ -33,7 +33,8 @@ struct AppCommands: Commands {
             Divider()
             Button("Restart Session") { store.requestRestart() }
                 .disabled(s == nil)
-            Button("Show in Finder") { store.showInFinder() }
+            Button("Export…") { store.exportSession() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(s == nil)
             Button("Delete Session…") { if let id = s?.id { store.requestDelete(id) } }
                 .disabled(s == nil)

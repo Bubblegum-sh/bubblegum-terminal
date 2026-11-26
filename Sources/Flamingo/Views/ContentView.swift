@@ -39,7 +39,7 @@ struct ContentView: View {
             HookSetupSheet()
                 .environment(\.theme, theme)
         }
-        .alert("Couldn’t install hooks", isPresented: errorBinding, presenting: store.errorMessage) { _ in
+        .alert(store.errorTitle, isPresented: errorBinding, presenting: store.errorMessage) { _ in
             Button("OK") { store.errorMessage = nil }
         } message: { Text($0) }
         .confirmationDialog(

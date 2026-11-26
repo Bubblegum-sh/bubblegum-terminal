@@ -122,6 +122,7 @@ struct SessionRow: View {
         if session.isArchived {
             Button("Unarchive") { store.toggleArchive(session.id) }
             Button("Rename…") { store.beginRename(session.id) }
+            Button("Export…") { store.exportSession(session.id) }
             Divider()
             Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
         } else {
@@ -129,7 +130,7 @@ struct SessionRow: View {
             Button("Archive") { store.toggleArchive(session.id) }
             Divider()
             Button("Restart Session") { store.requestRestart(session.id) }
-            Button("Show in Finder") { store.showInFinder(session.id) }
+            Button("Export…") { store.exportSession(session.id) }
             Divider()
             Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
         }

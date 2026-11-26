@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import FlamingoCore
 
 /// Development aid: `FLAMINGO_SNAPSHOT=/path/prefix` writes PNGs of the main window
 /// (optionally after toggling UI via `FLAMINGO_SNAPSHOT_STEPS`), then quits.
@@ -34,6 +35,16 @@ enum DebugSnapshot {
                 case "fullscreen", "windowed":
                     NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 600 })?.toggleFullScreen(nil)
                     try? await Task.sleep(for: .seconds(5))
+                case "exportmd":
+                    // Renders the selected session's transcript (or FLAMINGO_EXPORT_TRANSCRIPT) without a save panel.
+                    if let s = store.selected {
+                        let url = env["FLAMINGO_EXPORT_TRANSCRIPT"].map { URL(fileURLWithPath: $0) }
+                            ?? s.claudeSessionId.flatMap { ClaudeTranscripts.url(sessionId: $0) }
+                        if let url, let data = try? Data(contentsOf: url) {
+                            let md = TranscriptExporter.markdown(transcript: data, metadata: .init(title: s.name, directory: s.directory, model: s.modelInfo, claudeSessionId: s.claudeSessionId))
+                            try? md.write(toFile: "\(prefix)-export.md", atomically: true, encoding: .utf8)
+                        }
+                    }
                 case "askdelete": if let id = store.selectedId { store.requestDelete(id) }
                 case "delete": if let id = store.confirmDeleteId ?? store.selectedId { store.delete(id) }
                 case "hittest": hitTest(to: "\(prefix)-hits.txt")

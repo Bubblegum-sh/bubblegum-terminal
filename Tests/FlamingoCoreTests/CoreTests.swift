@@ -518,3 +518,82 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(ClaudeTranscripts.projectsDirectory(environment: ["CLAUDE_CONFIG_DIR": "/cfg"], home: home).path == "/cfg/projects")
     }
 }
+
+@Suite struct TranscriptExporterTests {
+    let utc = TimeZone(identifier: "UTC")!
+
+    func jsonl(_ records: [[String: Any]]) -> Data {
+        Data(records.map { String(data: try! JSONSerialization.data(withJSONObject: $0), encoding: .utf8)! }.joined(separator: "\n").utf8)
+    }
+
+    var sample: Data {
+        jsonl([
+            ["type": "ai-title", "aiTitle": "Fix the tests"],
+            ["type": "user", "timestamp": "2026-11-27T10:41:00.000Z", "message": ["role": "user", "content": "run the tests please"]],
+            ["type": "user", "isMeta": true, "message": ["content": [["type": "text", "text": "meta stuff"]]]],
+            ["type": "assistant", "timestamp": "2026-11-27T10:41:05.000Z", "message": ["content": [["type": "thinking", "thinking": "secret"]]]],
+            ["type": "assistant", "timestamp": "2026-11-27T10:41:06.000Z", "message": ["content": [["type": "text", "text": "Running them now."]]]],
+            ["type": "assistant", "message": ["content": [["type": "tool_use", "id": "t1", "name": "Bash", "input": ["command": "npm test"]]]]],
+            ["type": "user", "message": ["content": [["type": "tool_result", "tool_use_id": "t1", "content": "42 passed ```inner```", "is_error": false]]]],
+            ["type": "assistant", "message": ["content": [["type": "text", "text": "All **42** tests pass."]]]],
+            ["type": "assistant", "isSidechain": true, "message": ["content": [["type": "text", "text": "subagent chatter"]]]],
+            ["type": "user", "timestamp": "2026-11-27T10:45:00.000Z", "message": ["content": "<command-name>/model</command-name>\n<command-args>opus</command-args>"]],
+            ["type": "user", "message": ["content": "<local-command-caveat>Caveat: ignore</local-command-caveat>"]],
+            ["type": "user", "message": ["content": [["type": "text", "text": "thanks"], ["type": "image", "source": [:]]]]],
+        ])
+    }
+
+    @Test func rendersConversation() {
+        let md = TranscriptExporter.markdown(
+            transcript: sample,
+            metadata: .init(title: "API migration", directory: "/tmp/api", model: ModelInfo(model: "claude-opus-5-5", effort: "high"),
+                            claudeSessionId: "abc", exportedAt: Date(timeIntervalSince1970: 1_800_000_000)),
+            timeZone: utc)
+        #expect(md.hasPrefix("# API migration\n"))
+        #expect(md.contains("- **Model:** Opus 5.5 · High effort"))
+        #expect(md.contains("- **Claude session:** `abc`"))
+        #expect(md.contains("## You · 2026-11-27 10:41\n\nrun the tests please"))
+        #expect(md.contains("## Claude · 2026-11-27 10:41\n\nRunning them now."))
+        #expect(md.contains("<summary>Bash: npm test</summary>"))
+        #expect(md.contains("**Output**\n\n````\n42 passed ```inner```\n````"))  // fence longer than inner backticks
+        #expect(md.contains("All **42** tests pass."))
+        #expect(md.contains("`/model opus`"))
+        #expect(md.contains("thanks\n\n_[image]_"))
+        #expect(!md.contains("secret"))
+        #expect(!md.contains("meta stuff"))
+        #expect(!md.contains("subagent chatter"))
+        #expect(!md.contains("Caveat"))
+        // One Claude heading for the whole answer (text + tool + text), then the next user turn.
+        #expect(md.components(separatedBy: "## Claude").count == 2)
+        #expect(md.components(separatedBy: "## You").count == 3)
+        #expect(TranscriptExporter.aiTitle(transcript: sample) == "Fix the tests")
+    }
+
+    @Test func emptyTranscript() {
+        let md = TranscriptExporter.markdown(transcript: Data(), metadata: .init(title: "x"), timeZone: utc)
+        #expect(md.contains("_No messages in this session yet._"))
+    }
+
+    @Test func truncatesLongToolOutput() {
+        let long = String(repeating: "a", count: TranscriptExporter.maxToolText + 10)
+        let data = jsonl([
+            ["type": "assistant", "message": ["content": [["type": "tool_use", "id": "t", "name": "Read", "input": ["file_path": "/x"]]]]],
+            ["type": "user", "message": ["content": [["type": "tool_result", "tool_use_id": "t", "content": [["type": "text", "text": long]], "is_error": true]]]],
+        ])
+        let md = TranscriptExporter.markdown(transcript: data, metadata: .init(title: "x"), timeZone: utc)
+        #expect(md.contains("**Error**"))
+        #expect(md.contains("… (10 more characters)"))
+        #expect(md.contains("<summary>Read: /x</summary>"))
+    }
+
+    @Test func fileNamesAndLookup() throws {
+        #expect(TranscriptExporter.suggestedFileName(for: "API: v2/beta") == "API- v2-beta.md")
+        #expect(TranscriptExporter.suggestedFileName(for: "  ") == "Session.md")
+        let projects = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-proj-\(UUID())")
+        let dir = projects.appendingPathComponent("-x")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data().write(to: dir.appendingPathComponent("s1.jsonl"))
+        #expect(ClaudeTranscripts.url(sessionId: "s1", in: projects)?.lastPathComponent == "s1.jsonl")
+        #expect(ClaudeTranscripts.url(sessionId: "s2", in: projects) == nil)
+    }
+}
