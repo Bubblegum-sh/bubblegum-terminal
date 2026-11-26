@@ -9,15 +9,19 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // Top row: traffic lights live on the left, "+" on the right.
+            // Top row (design: 14 pt top padding, 26 pt row, 6 pt below). The traffic
+            // lights sit on the left of this row; WindowChrome centers them on it.
             HStack(spacing: 0) {
                 WindowDragArea()
                 IconButton(systemImage: "plus", label: "New session (⌘T)", size: 14) {
                     store.newSessionWithPicker()
                 }
             }
-            .frame(height: 28)
+            .frame(height: 26)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
             .padding(.trailing, 2)
+            .background(WindowDragArea())
 
             searchField
 

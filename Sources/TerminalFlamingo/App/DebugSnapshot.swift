@@ -19,6 +19,7 @@ enum DebugSnapshot {
                 case "search": store.query = "pa"
                 case "clear": store.query = ""; store.showQuickSwitcher = false
                 case "rename": store.beginRename()
+                case "hittest": hitTest(to: "\(prefix)-hits.txt")
                 default: break
                 }
                 try? await Task.sleep(for: .seconds(1.5))
@@ -33,6 +34,28 @@ enum DebugSnapshot {
             }
             NSApp.terminate(nil)
         }
+    }
+
+    /// Reports which view receives a click at the "+" button and toolbar buttons,
+    /// and where the traffic lights are (points from the window's top-left).
+    private static func hitTest(to path: String) {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 600 }),
+              let frameView = window.contentView?.superview else { return }
+        let h = frameView.bounds.height
+        var lines: [String] = []
+        if let close = window.standardWindowButton(.closeButton), let sv = close.superview {
+            let r = sv.convert(close.frame, to: nil)
+            lines.append("closeButton center y from top = \(h - r.midY)")
+        }
+        let w = frameView.bounds.width
+        for (name, x, yTop) in [("plus", 255.0, 27.0), ("pencil", w - 63, 26.0), ("restart", w - 31, 26.0), ("search", 120.0, 66.0)] {
+            let hit = frameView.hitTest(NSPoint(x: x, y: h - yTop))
+            var chain: [String] = []
+            var v: NSView? = hit
+            while let cur = v, chain.count < 4 { chain.append(String(describing: type(of: cur))); v = cur.superview }
+            lines.append("\(name) @(\(Int(x)),\(Int(yTop))): \(chain.joined(separator: " < "))")
+        }
+        try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     private static func capture(to path: String) {

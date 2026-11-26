@@ -22,6 +22,7 @@ struct ContentView: View {
             }
         }
         .background(theme.windowC)
+        .background(WindowChrome())
         .foregroundStyle(theme.text1)
         .ignoresSafeArea()
         .environment(\.theme, theme)
@@ -69,6 +70,30 @@ struct ContentView: View {
     private var deleteBinding: Binding<Bool> {
         Binding(get: { store.confirmDeleteId != nil }, set: { if !$0 { store.confirmDeleteId = nil } })
     }
+}
+
+/// Gives the window a 52 pt transparent title bar (an empty unified toolbar), so the
+/// traffic lights are vertically centered on the sidebar's top row and the 52 pt
+/// detail header, as on the Main window artboard.
+struct WindowChrome: NSViewRepresentable {
+    final class ChromeView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window, window.toolbar == nil else { return }
+            let toolbar = NSToolbar(identifier: "TerminalFlamingoMain")
+            toolbar.displayMode = .iconOnly
+            toolbar.allowsUserCustomization = false
+            window.toolbar = toolbar
+            window.toolbarStyle = .unified
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.titlebarSeparatorStyle = .none
+            window.styleMask.insert(.fullSizeContentView)
+        }
+    }
+
+    func makeNSView(context: Context) -> NSView { ChromeView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 /// Lets an empty area of our custom title region drag the window (and double-click to zoom).
