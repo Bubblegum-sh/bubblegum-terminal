@@ -16,14 +16,19 @@ public struct HookEvent: Equatable, Sendable {
     public var claudeSessionId: String?
     public var cwd: String?
     public var message: String?
+    public var transcriptPath: String?
+    /// Filled in off the main thread from the transcript's tail (see `HookEventWatcher`).
+    public var modelInfo: ModelInfo?
 
-    public init(appSessionId: UUID, kind: Kind?, rawEventName: String? = nil, claudeSessionId: String? = nil, cwd: String? = nil, message: String? = nil) {
+    public init(appSessionId: UUID, kind: Kind?, rawEventName: String? = nil, claudeSessionId: String? = nil, cwd: String? = nil, message: String? = nil, transcriptPath: String? = nil, modelInfo: ModelInfo? = nil) {
         self.appSessionId = appSessionId
         self.kind = kind
         self.rawEventName = rawEventName ?? kind?.rawValue
         self.claudeSessionId = claudeSessionId
         self.cwd = cwd
         self.message = message
+        self.transcriptPath = transcriptPath
+        self.modelInfo = modelInfo
     }
 
     /// Parses an event file. Returns nil for malformed files or a missing/invalid `tf` id.
@@ -40,7 +45,8 @@ public struct HookEvent: Equatable, Sendable {
             rawEventName: name,
             claudeSessionId: sid,
             cwd: payload["cwd"] as? String,
-            message: payload["message"] as? String
+            message: payload["message"] as? String,
+            transcriptPath: payload["transcript_path"] as? String
         )
     }
 }
@@ -62,6 +68,7 @@ public enum SessionReducer {
     @discardableResult
     public static func apply(_ event: HookEvent, to s: inout Session, isFocused: Bool, now: Date = Date()) -> SessionAlert? {
         if let sid = event.claudeSessionId { s.claudeSessionId = sid }
+        if let info = event.modelInfo { s.modelInfo = info }
         s.lastActivity = now
         guard let kind = event.kind else { return nil }
 

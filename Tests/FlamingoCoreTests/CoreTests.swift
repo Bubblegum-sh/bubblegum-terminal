@@ -411,3 +411,68 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(e?.kind == .stop)
     }
 }
+
+@Suite struct ModelInfoTests {
+    @Test func displayNames() {
+        #expect(ModelInfo.displayName(for: "claude-opus-5-5") == "Opus 5.5")
+        #expect(ModelInfo.displayName(for: "claude-sonnet-5-5") == "Sonnet 5.5")
+        #expect(ModelInfo.displayName(for: "claude-fable-5-2") == "Fable 5.2")
+        #expect(ModelInfo.displayName(for: "claude-haiku-4-5-20251001") == "Haiku 4.5")
+        #expect(ModelInfo.displayName(for: "claude-3-5-sonnet-20241022") == "Sonnet 3.5")
+        #expect(ModelInfo.displayName(for: "claude-opus-5-5[1m]") == "Opus 5.5 (1M)")
+        #expect(ModelInfo.displayName(for: "claude-opus-4-20250514") == "Opus 4")
+    }
+
+    @Test func effortLevels() {
+        #expect(ModelInfo(model: "m", effort: "low").effortLevel == 1)
+        #expect(ModelInfo(model: "m", effort: "high").effortLevel == 3)
+        #expect(ModelInfo(model: "m", effort: "high").effortLabel == "High")
+        #expect(ModelInfo(model: "m", effort: "xhigh").effortLabel == "Extra high")
+        #expect(ModelInfo(model: "m", effort: "max").effortLevel == 5)
+        #expect(ModelInfo(model: "m").effortLevel == nil)
+    }
+
+    @Test func readsLatestFromTranscriptTail() throws {
+        let lines = [
+            #"{"type":"assistant","message":{"model":"claude-sonnet-5-5"},"effort":"low"}"#,
+            #"{"type":"user","message":{"content":"hi"}}"#,
+            #"{"type":"assistant","message":{"model":"claude-opus-5-5"},"effort":"high","perTurnEffort":"high"}"#,
+            #"{"type":"assistant","message":{"model":"<synthetic>"}}"#,
+            #"{"type":"last-prompt"}"#,
+            "not json",
+        ]
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-transcript-\(UUID()).jsonl")
+        try Data(lines.joined(separator: "\n").utf8).write(to: url)
+        #expect(ModelInfo.latest(inTranscript: url) == ModelInfo(model: "claude-opus-5-5", effort: "high"))
+        // A small tail window that starts mid-line still finds a complete record.
+        #expect(ModelInfo.latest(inTranscript: url, tailBytes: 200)?.model == "claude-opus-5-5")
+        #expect(ModelInfo.latest(inTranscript: url.appendingPathExtension("missing")) == nil)
+    }
+
+    @Test func apiRequestRecordAlsoWorks() {
+        let tail = Data(#"{"type":"api-request","params":{"model":"claude-opus-5-5","output_config":{"effort":"medium"}}}"#.utf8)
+        #expect(ModelInfo.latest(inTranscriptTail: tail) == ModelInfo(model: "claude-opus-5-5", effort: "medium"))
+    }
+
+    @Test func hookEventCarriesTranscriptAndUpdatesSession() {
+        let id = UUID()
+        let e = HookEvent.parse(Data(#"{"flamingo":"\#(id.uuidString)","payload":{"hook_event_name":"Stop","transcript_path":"/tmp/t.jsonl"}}"#.utf8))
+        #expect(e?.transcriptPath == "/tmp/t.jsonl")
+        var s = Session(id: id, name: "x", directory: "/x", status: .working)
+        var ev = e!
+        ev.modelInfo = ModelInfo(model: "claude-opus-5-5", effort: "high")
+        SessionReducer.apply(ev, to: &s, isFocused: true)
+        #expect(s.modelInfo?.displayModel == "Opus 5.5")
+        // Events without model info keep the last known value.
+        SessionReducer.apply(HookEvent(appSessionId: id, kind: .userPromptSubmit), to: &s, isFocused: true)
+        #expect(s.modelInfo?.effort == "high")
+    }
+
+    @Test func modelInfoIsPersisted() throws {
+        var s = Session(name: "x", directory: "/x")
+        s.modelInfo = ModelInfo(model: "claude-opus-5-5", effort: "high")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-mi-\(UUID()).json")
+        try PersistedState(sessions: [s]).save(to: url)
+        #expect(PersistedState.load(from: url)?.sessions.first?.modelInfo == s.modelInfo)
+    }
+}

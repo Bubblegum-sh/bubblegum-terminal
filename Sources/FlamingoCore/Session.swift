@@ -44,6 +44,8 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
     public var createdAt: Date
     public var lastActivity: Date
     public var unread: Bool
+    /// Model and effort from the last answer (persisted so it shows after relaunch).
+    public var modelInfo: ModelInfo?
 
     // Runtime only (excluded from CodingKeys).
     public var terminalTitle: String?
@@ -54,7 +56,7 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         // Files written before pinning was removed may still contain "isPinned"; it is ignored.
-        case id, name, directory, claudeSessionId, isArchived, createdAt, lastActivity, unread
+        case id, name, directory, claudeSessionId, isArchived, createdAt, lastActivity, unread, modelInfo
     }
 
     public init(

@@ -56,6 +56,9 @@ struct SessionDetailView: View {
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
                 StatusPill(session: s)
+                if let info = s.modelInfo {
+                    ModelPill(info: info)
+                }
             } else {
                 WindowDragArea()
             }
@@ -103,6 +106,79 @@ struct StatusPill: View {
         .help(session.status.label)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Status: \(label)")
+    }
+}
+
+/// Model and reasoning effort from the session's last answer (read from its transcript).
+struct ModelPill: View {
+    let info: ModelInfo
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Burst()
+                .stroke(theme.accentC, style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+                .frame(width: 12, height: 12)
+                .accessibilityHidden(true)
+            Text(info.displayModel)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.text1)
+                .lineLimit(1)
+            if let level = info.effortLevel, let label = info.effortLabel {
+                Rectangle().fill(theme.borderC).frame(width: 1, height: 12)
+                EffortBars(level: level)
+                Text("\(label) effort")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(theme.text2)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .overlay(Capsule().stroke(theme.borderC, lineWidth: 1))
+        .fixedSize()
+        .help("Model and reasoning effort of the last answer")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var t = "Model \(info.displayModel)"
+        if let label = info.effortLabel { t += ", \(label.lowercased()) effort" }
+        return t
+    }
+}
+
+/// Five rising bars; the first `level` are filled in accent.
+private struct EffortBars: View {
+    let level: Int
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 2) {
+            ForEach(1...ModelInfo.effortLevels.count, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(i <= level ? theme.accentC : theme.text3.opacity(0.35))
+                    .frame(width: 3, height: 4 + CGFloat(i) * 1.6)
+            }
+        }
+        .frame(height: 12, alignment: .bottom)
+    }
+}
+
+/// A small eight-ray starburst.
+private struct Burst: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let outer = min(rect.width, rect.height) / 2
+        let inner = outer * 0.38
+        for i in 0..<8 {
+            let a = Double(i) * .pi / 4
+            p.move(to: CGPoint(x: c.x + inner * cos(a), y: c.y + inner * sin(a)))
+            p.addLine(to: CGPoint(x: c.x + outer * cos(a), y: c.y + outer * sin(a)))
+        }
+        return p
     }
 }
 

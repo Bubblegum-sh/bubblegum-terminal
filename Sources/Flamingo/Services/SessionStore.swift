@@ -199,7 +199,7 @@ final class SessionStore: ObservableObject {
             $0.claudeNotFound = false
             $0.terminalTitle = nil
             $0.lastMessage = nil
-            if !resume { $0.claudeSessionId = nil }
+            if !resume { $0.claudeSessionId = nil; $0.modelInfo = nil }
         }
         if id == selectedId { terminalFocusRequest += 1 }
     }

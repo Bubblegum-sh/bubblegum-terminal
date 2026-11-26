@@ -65,7 +65,12 @@ public final class HookEventWatcher: @unchecked Sendable {
         for url in files.map(\.url) {
             let data = try? Data(contentsOf: url)
             try? fm.removeItem(at: url)
-            if let data, let e = HookEvent.parse(data) { events.append(e) }
+            if let data, var e = HookEvent.parse(data) {
+                if let path = e.transcriptPath, !path.isEmpty {
+                    e.modelInfo = ModelInfo.latest(inTranscript: URL(fileURLWithPath: path))
+                }
+                events.append(e)
+            }
         }
         return events
     }
