@@ -79,7 +79,7 @@ struct SessionDetailView: View {
             Text("No sessions yet — ⌘T to start one")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(theme.text2)
-            Button("New Session…") { store.newSessionWithPicker() }
+            Button("New Session…") { store.showNewSessionSheet() }
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
         }

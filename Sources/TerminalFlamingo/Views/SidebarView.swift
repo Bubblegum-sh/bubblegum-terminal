@@ -14,7 +14,7 @@ struct SidebarView: View {
             HStack(spacing: 0) {
                 WindowDragArea()
                 IconButton(systemImage: "plus", label: "New session (⌘T)", size: 14) {
-                    store.newSessionWithPicker()
+                    store.showNewSessionSheet()
                 }
             }
             .frame(height: 26)

@@ -19,6 +19,11 @@ enum DebugSnapshot {
                 case "search": store.query = "pa"
                 case "clear": store.query = ""; store.showQuickSwitcher = false
                 case "rename": store.beginRename()
+                case "newsession": store.showNewSessionSheet()
+                case "down": store.newSessionIndex += 1
+                case "filter": store.newSessionFilter = "par"
+                case "close": store.closeNewSessionSheet()
+                case "ended": store.debugEnd()
                 case "hittest": hitTest(to: "\(prefix)-hits.txt")
                 default: break
                 }

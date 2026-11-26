@@ -16,6 +16,11 @@ final class SessionStore: ObservableObject {
     // UI state
     @Published var renamingId: UUID?
     @Published var showQuickSwitcher = false
+    /// The New session sheet (⌘T) and its filter / focused row.
+    @Published var showNewSession = false
+    @Published var newSessionFilter = ""
+    @Published var newSessionIndex = 0
+    @Published private(set) var recents = RecentProjects()
     @Published var quickSwitcherHighlight: UUID?
     @Published var hooksInstalled = false
     @Published var showHookSheet = false
@@ -43,6 +48,8 @@ final class SessionStore: ObservableObject {
             archivedOpen = state.archivedOpen
         }
         if selectedId == nil { selectedId = sessions.first { !$0.isArchived }?.id }
+        recents = RecentProjects.load(from: paths.recentsFile)
+        if recents.prune() { saveRecents() }
     }
 
     /// Called once the app has finished launching.
@@ -92,8 +99,54 @@ final class SessionStore: ObservableObject {
 
     // MARK: Create / open
 
-    /// S-1: ⌘T or "+" opens a folder picker.
-    func newSessionWithPicker() {
+    /// S-1: ⌘T or "+" opens the New session sheet.
+    func showNewSessionSheet() {
+        showQuickSwitcher = false
+        if recents.prune() { saveRecents() }
+        newSessionFilter = ""
+        newSessionIndex = 0
+        showNewSession = true
+    }
+
+    func closeNewSessionSheet() {
+        showNewSession = false
+        terminalFocusRequest += 1
+    }
+
+    /// Recent rows as shown in the sheet (filtered, newest first, max 9).
+    var visibleRecents: [RecentProject] { recents.visible(filter: newSessionFilter) }
+
+    func sessionCount(inFolder path: String) -> Int {
+        let p = (path as NSString).standardizingPath
+        return sessions.filter { ($0.directory as NSString).standardizingPath == p }.count
+    }
+
+    /// Opening a recent project always creates a new session in that folder.
+    func openRecent(at index: Int) {
+        let list = visibleRecents
+        guard list.indices.contains(index) else { return }
+        let path = list[index].path
+        showNewSession = false
+        guard RecentProjects.directoryExists(path) else {
+            recents.prune()
+            saveRecents()
+            errorMessage = "\(Session.abbreviate(path)) no longer exists."
+            return
+        }
+        createSession(directory: path)
+    }
+
+    /// Blank session (⌘N): no project, starts in the home folder.
+    func startBlankSession() {
+        showNewSession = false
+        let name = SessionNaming.unique(SessionNaming.blankSessionName, existing: sessions.map(\.name))
+        createSession(directory: NSHomeDirectory(), name: name)
+    }
+
+    /// Open project… (⌘O): folder picker.
+    func openProjectWithPicker() {
+        showNewSession = false
+        showQuickSwitcher = false
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -106,8 +159,8 @@ final class SessionStore: ObservableObject {
         createSession(directory: url.path)
     }
 
-    func createSession(directory: String) {
-        let name = SessionNaming.unique(SessionNaming.defaultName(for: directory), existing: sessions.map(\.name))
+    func createSession(directory: String, name: String? = nil) {
+        let name = name ?? SessionNaming.unique(SessionNaming.defaultName(for: directory), existing: sessions.map(\.name))
         let s = Session(name: name, directory: directory, status: .paused)
         sessions.append(s)
         query = ""
@@ -137,6 +190,9 @@ final class SessionStore: ObservableObject {
         guard var s = session(id) else { return }
         if !resume { s.claudeSessionId = nil }
         terminals.start(s, resume: resume)
+        // Every project session start updates recents (blank sessions in ~ are skipped).
+        recents.record(path: s.directory)
+        saveRecents()
         mutate(id) {
             $0.status = .starting
             $0.claudeNotFound = false
@@ -245,12 +301,14 @@ final class SessionStore: ObservableObject {
 
     func focusSearch() {
         showQuickSwitcher = false
+        showNewSession = false
         searchFocusRequest += 1
     }
 
     func focusTerminal() { terminalFocusRequest += 1 }
 
     func toggleQuickSwitcher() {
+        showNewSession = false
         showQuickSwitcher.toggle()
         if !showQuickSwitcher { terminalFocusRequest += 1 }
     }
@@ -262,6 +320,7 @@ final class SessionStore: ObservableObject {
 
     /// F-3: ⌘1…⌘9.
     func selectVisible(index: Int) {
+        if showNewSession { openRecent(at: index); return }
         let ids = visibleIds
         guard ids.indices.contains(index) else { return }
         select(ids[index])
@@ -337,12 +396,25 @@ final class SessionStore: ObservableObject {
         f(&sessions[i])
     }
 
+    private func saveRecents() {
+        do { try recents.save(to: paths.recentsFile) } catch {
+            NSLog("TerminalFlamingo: could not save recent projects: \(error)")
+        }
+    }
+
     private func persist() {
         let state = PersistedState(sessions: sessions, selectedId: selectedId, archivedOpen: archivedOpen)
         do { try state.save(to: paths.sessionsFile) } catch {
             NSLog("TerminalFlamingo: could not save sessions: \(error)")
         }
     }
+
+    #if DEBUG
+    /// Snapshot aid: end the selected session's process to show the Ended bar.
+    func debugEnd() {
+        if let id = selectedId { terminals.remove(id); processExited(id, exitCode: 0) }
+    }
+    #endif
 
     func shutdown() {
         persist()

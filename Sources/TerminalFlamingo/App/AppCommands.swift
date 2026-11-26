@@ -8,8 +8,12 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Session…") { store.newSessionWithPicker() }
+            Button("New Session…") { store.showNewSessionSheet() }
                 .keyboardShortcut("t", modifiers: .command)
+            Button("Open Project…") { store.openProjectWithPicker() }
+                .keyboardShortcut("o", modifiers: .command)
+            Button("Blank Session") { store.startBlankSession() }
+                .keyboardShortcut("n", modifiers: .command)
         }
 
         CommandGroup(after: .textEditing) {

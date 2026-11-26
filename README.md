@@ -36,5 +36,6 @@ points at the Command Line Tools. For an Xcode project: `xcodegen generate` (use
 
 ## Development aids (debug builds)
 
-- `TF_SUPPORT_DIR=/some/dir` uses another folder for sessions/events instead of Application Support.
+- `TF_SUPPORT_DIR=/some/dir` uses another folder for sessions/events instead of Application Support;
+  "Install hooks" then writes to `/some/dir/claude/settings.json` (or `TF_CLAUDE_DIR`), never the real `~/.claude`.
 - `TF_SNAPSHOT=/tmp/shot TF_SNAPSHOT_STEPS=main,switcher,clear,search,rename,light` renders window snapshots, then quits.

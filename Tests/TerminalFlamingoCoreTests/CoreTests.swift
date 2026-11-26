@@ -70,6 +70,27 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(!FileManager.default.fileExists(atPath: p.claudeSettingsBackup.path))
     }
 
+    @Test func reinstallFromNonStandardPathDoesNotDuplicate() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("tf-odd-\(UUID().uuidString)")
+        let p = AppPaths(supportDirectory: base.appendingPathComponent("support"), claudeDirectory: base.appendingPathComponent(".claude"))
+        let inst = HookInstaller(paths: p)
+        #expect(!inst.hookCommand.contains(HookInstaller.marker))
+        try inst.install()
+        try inst.install()
+        #expect(inst.isInstalled())
+        let hooks = try readJSON(p.claudeSettings)["hooks"] as! [String: Any]
+        for e in HookInstaller.events { #expect((hooks[e] as! [[String: Any]]).count == 1) }
+    }
+
+    @Test func devSupportDirNeverTargetsRealClaudeFolder() {
+        let home = URL(fileURLWithPath: "/Users/me")
+        let dev = AppPaths.standard(environment: ["TF_SUPPORT_DIR": "/tmp/tf"], home: home)
+        #expect(dev.claudeSettings.path == "/tmp/tf/claude/settings.json")
+        let real = AppPaths.standard(environment: [:], home: home)
+        #expect(real.claudeSettings.path == "/Users/me/.claude/settings.json")
+        #expect(real.hookScript.path == "/Users/me/Library/Application Support/TerminalFlamingo/hook.sh")
+    }
+
     @Test func notInstalledWhenAnEventIsMissing() throws {
         let p = tempPaths()
         let inst = HookInstaller(paths: p)
@@ -257,5 +278,71 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func titleCleanup() {
         #expect(Session.cleanTitle("✳ Fix the tests") == "Fix the tests")
         #expect(Session.cleanTitle("⠂ ") == nil)
+    }
+}
+
+@Suite struct RecentProjectsTests {
+    let home = "/Users/me"
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func recordsNewestFirstWithoutDuplicates() {
+        var r = RecentProjects()
+        r.record(path: "/code/api", at: now.addingTimeInterval(-100), home: home)
+        r.record(path: "/code/parser", at: now.addingTimeInterval(-50), home: home)
+        r.record(path: "/code/api/", at: now, home: home)
+        #expect(r.visible().map(\.path) == ["/code/api", "/code/parser"])
+    }
+
+    @Test func homeFolderIsNotRecorded() {
+        var r = RecentProjects()
+        r.record(path: home, at: now, home: home)
+        r.record(path: home + "/", at: now, home: home)
+        #expect(r.entries.isEmpty)
+    }
+
+    @Test func showsAtMostNineAndFilters() {
+        var r = RecentProjects()
+        for i in 0..<12 { r.record(path: "/p/proj\(i)", at: now.addingTimeInterval(Double(i)), home: home) }
+        #expect(r.visible().count == 9)
+        #expect(r.visible().first?.path == "/p/proj11")
+        #expect(r.visible(filter: "PROJ1").map(\.path) == ["/p/proj11", "/p/proj10", "/p/proj1"])
+        #expect(r.visible(filter: "zzz").isEmpty)
+    }
+
+    @Test func prunesMissingFolders() {
+        var r = RecentProjects()
+        r.record(path: "/keep", at: now, home: home)
+        r.record(path: "/gone", at: now, home: home)
+        let changed = r.prune(exists: { $0 == "/keep" })
+        #expect(changed)
+        #expect(r.entries.map(\.path) == ["/keep"])
+        let changedAgain = r.prune(exists: { _ in true })
+        #expect(!changedAgain)
+    }
+
+    @Test func persistenceRoundTrip() throws {
+        var r = RecentProjects()
+        r.record(path: "/code/api", at: now, home: home)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("tf-recents-\(UUID()).json")
+        try r.save(to: url)
+        #expect(RecentProjects.load(from: url) == r)
+        #expect(RecentProjects.load(from: url.appendingPathExtension("missing")).entries.isEmpty)
+    }
+
+    @Test func meta() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let noon = Date(timeIntervalSince1970: 1_800_014_400) // 2027-01-15 12:00 UTC... any midday
+        let n = cal.date(bySettingHour: 12, minute: 0, second: 0, of: noon)!
+        #expect(RecentProjects.meta(sessionCount: 2, lastOpened: n.addingTimeInterval(-3600), now: n, calendar: cal) == "2 sessions · 1h ago")
+        #expect(RecentProjects.meta(sessionCount: 1, lastOpened: n.addingTimeInterval(-5 * 3600), now: n, calendar: cal) == "1 session · today")
+        #expect(RecentProjects.meta(sessionCount: 0, lastOpened: n.addingTimeInterval(-24 * 3600), now: n, calendar: cal) == "yesterday")
+        #expect(RecentProjects.meta(sessionCount: 0, lastOpened: n.addingTimeInterval(-3 * 86400), now: n, calendar: cal) == "3d ago")
+        #expect(RecentProjects.meta(sessionCount: 0, lastOpened: n.addingTimeInterval(-8 * 86400), now: n, calendar: cal) == "1w ago")
+        #expect(RecentProjects.meta(sessionCount: 0, lastOpened: n.addingTimeInterval(-20), now: n, calendar: cal) == "just now")
+    }
+
+    @Test func blankSessionNames() {
+        #expect(SessionNaming.unique(SessionNaming.blankSessionName, existing: ["Blank session"]) == "Blank session 2")
     }
 }

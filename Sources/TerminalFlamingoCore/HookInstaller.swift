@@ -10,18 +10,25 @@ public struct AppPaths: Sendable {
         self.claudeDirectory = claudeDirectory
     }
 
-    /// The real locations. `TF_SUPPORT_DIR` overrides the app's own folder (for development only:
-    /// hook.sh always writes events to the standard folder).
+    /// The real locations. For development, `TF_SUPPORT_DIR` overrides the app's own folder;
+    /// Claude's folder then defaults to `<TF_SUPPORT_DIR>/claude` (or `TF_CLAUDE_DIR`) so a
+    /// dev run can never write hooks into the real ~/.claude.
     public static var standard: AppPaths {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let override = ProcessInfo.processInfo.environment["TF_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        standard(environment: ProcessInfo.processInfo.environment)
+    }
+
+    public static func standard(environment env: [String: String], home: URL = FileManager.default.homeDirectoryForCurrentUser) -> AppPaths {
+        let support = env["TF_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let claude = env["TF_CLAUDE_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? support?.appendingPathComponent("claude", isDirectory: true)
         return AppPaths(
-            supportDirectory: override ?? home.appendingPathComponent("Library/Application Support/TerminalFlamingo", isDirectory: true),
-            claudeDirectory: home.appendingPathComponent(".claude", isDirectory: true)
+            supportDirectory: support ?? home.appendingPathComponent("Library/Application Support/TerminalFlamingo", isDirectory: true),
+            claudeDirectory: claude ?? home.appendingPathComponent(".claude", isDirectory: true)
         )
     }
 
     public var sessionsFile: URL { supportDirectory.appendingPathComponent("sessions.json") }
+    public var recentsFile: URL { supportDirectory.appendingPathComponent("recents.json") }
     public var hookScript: URL { supportDirectory.appendingPathComponent("hook.sh") }
     public var eventsDirectory: URL { supportDirectory.appendingPathComponent("events", isDirectory: true) }
     public var claudeSettings: URL { claudeDirectory.appendingPathComponent("settings.json") }
@@ -81,21 +88,23 @@ public struct HookInstaller: Sendable {
         guard fm.isExecutableFile(atPath: paths.hookScript.path),
               let data = try? Data(contentsOf: paths.claudeSettings),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        return Self.containsAllEntries(obj)
+        return Self.containsAllEntries(obj, command: hookCommand)
     }
 
-    static func containsAllEntries(_ settings: [String: Any]) -> Bool {
+    static func containsAllEntries(_ settings: [String: Any], command: String? = nil) -> Bool {
         guard let hooks = settings["hooks"] as? [String: Any] else { return false }
         return events.allSatisfy { event in
             guard let groups = hooks[event] as? [[String: Any]] else { return false }
             return groups.contains { group in
-                (group["hooks"] as? [[String: Any]] ?? []).contains(where: isOurs)
+                (group["hooks"] as? [[String: Any]] ?? []).contains { isOurs($0, command: command) }
             }
         }
     }
 
-    static func isOurs(_ hook: [String: Any]) -> Bool {
-        (hook["command"] as? String)?.contains(marker) == true
+    /// Our entry: the command contains the standard marker, or is exactly this install's command.
+    static func isOurs(_ hook: [String: Any], command: String? = nil) -> Bool {
+        guard let c = hook["command"] as? String else { return false }
+        return c.contains(marker) || (command != nil && c == command)
     }
 
     // MARK: Install
@@ -170,7 +179,7 @@ public struct HookInstaller: Sendable {
             var groups = hooks[event] as? [[String: Any]] ?? []
             groups = groups.compactMap { group in
                 guard let inner = group["hooks"] as? [[String: Any]] else { return group }
-                let kept = inner.filter { !isOurs($0) }
+                let kept = inner.filter { !isOurs($0, command: command) }
                 if kept.count == inner.count { return group }
                 if kept.isEmpty { return nil }
                 var g = group

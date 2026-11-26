@@ -26,7 +26,17 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/TerminalFlamingo" "$APP/Contents/MacOS/TerminalFlamingo"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
-# .icns from the asset set
+# Asset catalog (AppIcon + AccentColor, the brand pink used by system buttons).
+if xcrun --find actool >/dev/null 2>&1; then
+  xcrun actool Resources/Assets.xcassets --compile "$APP/Contents/Resources" \
+    --platform macosx --minimum-deployment-target 14.0 \
+    --app-icon AppIcon --accent-color AccentColor \
+    --output-partial-info-plist "$(mktemp -d)/assets.plist" >/dev/null
+else
+  echo "warning: actool not found (install Xcode); AccentColor will fall back to the system accent" >&2
+fi
+
+# .icns from the asset set (also covers builds without actool)
 ICONSET="$(mktemp -d)/AppIcon.iconset"
 mkdir -p "$ICONSET"
 cp "$ICONSET_SRC"/icon_*.png "$ICONSET/"

@@ -53,6 +53,7 @@ struct SettingsView: View {
         .frame(width: 480)
         .background(theme.windowC)
         .foregroundStyle(theme.text1)
+        .tint(theme.accentFillC)
         .environment(\.theme, theme)
         .preferredColorScheme(theme.isDark ? .dark : .light)
     }

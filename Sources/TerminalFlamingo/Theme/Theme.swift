@@ -17,6 +17,8 @@ struct Theme: Equatable {
     var accent: NSColor
     /// Accent used for text (darker on light backgrounds for contrast).
     var accentText: NSColor
+    /// Fill for primary buttons (white text on it passes 4.5:1). Same as the app's AccentColor asset.
+    var accentFill: NSColor
     var statusWorking: NSColor
     var statusIdle: NSColor
     var isDark: Bool
@@ -24,14 +26,14 @@ struct Theme: Equatable {
     static let dark = Theme(
         window: .hex(0x1C1B20), sidebar: .hex(0x232228), terminal: .hex(0x131216), elevated: .hex(0x2B2A31),
         selectedRow: .hex(0x3A2531), border: .hex(0x34333A), textPrimary: .hex(0xF2F1F4), textSecondary: .hex(0xB3B0BB),
-        textTertiary: .hex(0x8E8B96), accent: .hex(0xFF5C8A), accentText: .hex(0xFF5C8A),
+        textTertiary: .hex(0x8E8B96), accent: .hex(0xFF5C8A), accentText: .hex(0xFF5C8A), accentFill: .hex(0xE30066),
         statusWorking: .hex(0xF5A524), statusIdle: .hex(0x3DD68C), isDark: true
     )
 
     static let light = Theme(
         window: .hex(0xFFFFFF), sidebar: .hex(0xF4F3F6), terminal: .hex(0xFBFAFC), elevated: .hex(0xE9E7EC),
         selectedRow: .hex(0xFCE1EB), border: .hex(0xE1DFE5), textPrimary: .hex(0x1C1B20), textSecondary: .hex(0x55525D),
-        textTertiary: .hex(0x6B6872), accent: .hex(0xFF5C8A), accentText: .hex(0xC7185A),
+        textTertiary: .hex(0x6B6872), accent: .hex(0xFF5C8A), accentText: .hex(0xC7185A), accentFill: .hex(0xC7185A),
         statusWorking: .hex(0xB86E00), statusIdle: .hex(0x0E8A50), isDark: false
     )
 
@@ -58,6 +60,7 @@ struct Theme: Equatable {
     var text3: Color { Color(nsColor: textTertiary) }
     var accentC: Color { Color(nsColor: accent) }
     var accentTextC: Color { Color(nsColor: accentText) }
+    var accentFillC: Color { Color(nsColor: accentFill) }
     func statusC(_ s: SessionStatus) -> Color { Color(nsColor: statusColor(s)) }
 }
 

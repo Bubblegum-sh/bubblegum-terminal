@@ -137,6 +137,8 @@ public enum SessionNaming {
         return "\(base) \(n)"
     }
 
+    public static let blankSessionName = "Blank session"
+
     /// Validates a rename. Returns the trimmed name, or nil when it must be rejected.
     public static func validatedRename(_ input: String) -> String? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)

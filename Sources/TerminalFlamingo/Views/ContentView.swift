@@ -20,10 +20,15 @@ struct ContentView: View {
                 QuickSwitcherView()
                     .transition(.opacity)
             }
+            if store.showNewSession {
+                NewSessionView()
+                    .transition(.opacity)
+            }
         }
         .background(theme.windowC)
         .background(WindowChrome())
         .foregroundStyle(theme.text1)
+        .tint(theme.accentFillC)
         .ignoresSafeArea()
         .environment(\.theme, theme)
         .preferredColorScheme(theme.isDark ? .dark : .light)
