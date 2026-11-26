@@ -56,14 +56,12 @@ struct SessionDetailView: View {
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
                 StatusPill(session: s)
-                IconButton(systemImage: "pencil", label: "Rename session (⌘R)") { store.beginRename(s.id) }
-                IconButton(systemImage: "arrow.clockwise", label: "Restart session") { store.requestRestart(s.id) }
             } else {
                 WindowDragArea()
             }
         }
         .padding(.leading, 18)
-        .padding(.trailing, 14)
+        .padding(.trailing, 18)
     }
 
     private func pathLine(_ s: Session) -> String {
