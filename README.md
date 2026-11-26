@@ -11,8 +11,14 @@ Requires Xcode 15+ installed (SwiftUI's macros ship with Xcode, not with the Com
 ```sh
 scripts/build-app.sh            # → build/Flamingo.app (universal, ad-hoc signed)
 open "build/Flamingo.app"
+scripts/run.sh                  # debug build of the .app, then launch it (use this rather than Run in Xcode)
 scripts/test.sh                 # unit tests (hook install/merge, event parsing, statuses, sidebar, launch)
 ```
+
+Run the app as a bundle (`scripts/run.sh`), not with Xcode's Run button: Xcode launches the bare
+SwiftPM executable, which has no Info.plist or asset catalog, so menus and controls fall back to system
+blue instead of the brand pink, and notifications are unavailable. (macOS also uses the user's own accent
+colour when one is picked in System Settings › Appearance; with Multicolor, the default, apps get theirs.)
 
 The scripts set `DEVELOPER_DIR` to `/Applications/Xcode.app` automatically if `xcode-select`
 points at the Command Line Tools. For an Xcode project: `xcodegen generate` (uses `project.yml`).

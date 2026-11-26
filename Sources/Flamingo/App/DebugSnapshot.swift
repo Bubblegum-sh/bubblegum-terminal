@@ -24,6 +24,11 @@ enum DebugSnapshot {
                 case "filter": store.newSessionFilter = "par"
                 case "close": store.closeNewSessionSheet()
                 case "ended": store.debugEnd()
+                case "colors":
+                    let c = NSColor.controlAccentColor.usingColorSpace(.sRGB)!
+                    let h = NSColor.selectedContentBackgroundColor.usingColorSpace(.sRGB)!
+                    let hex = { (c: NSColor) in String(format: "#%02X%02X%02X", Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255)) }
+                    try? "accent=\(hex(c)) selection=\(hex(h))".write(toFile: "\(prefix)-accent.txt", atomically: true, encoding: .utf8)
                 case "askdelete": if let id = store.selectedId { store.requestDelete(id) }
                 case "delete": if let id = store.confirmDeleteId ?? store.selectedId { store.delete(id) }
                 case "hittest": hitTest(to: "\(prefix)-hits.txt")
