@@ -476,3 +476,45 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(PersistedState.load(from: url)?.sessions.first?.modelInfo == s.modelInfo)
     }
 }
+
+@Suite struct SessionStartModelTests {
+    @Test func sessionStartShowsModelBeforeFirstAnswer() {
+        let id = UUID()
+        // Real SessionStart payload shape (captured from Claude Code).
+        let json = #"{"flamingo":"\#(id.uuidString)","payload":{"session_id":"72700620","transcript_path":"/nope.jsonl","cwd":"/x","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5-5"}}"#
+        let e = HookEvent.parse(Data(json.utf8))!
+        #expect(e.payloadModel == "claude-opus-5-5")
+        var s = Session(id: id, name: "x", directory: "/x", status: .starting)
+        SessionReducer.apply(e, to: &s, isFocused: true)
+        #expect(s.modelInfo == ModelInfo(model: "claude-opus-5-5", effort: nil))
+    }
+
+    @Test func effortIsKeptOnlyForTheSameModel() {
+        let id = UUID()
+        var s = Session(id: id, name: "x", directory: "/x", status: .idle)
+        s.modelInfo = ModelInfo(model: "claude-opus-5-5", effort: "high")
+        SessionReducer.apply(HookEvent(appSessionId: id, kind: .sessionStart, payloadModel: "claude-opus-5-5"), to: &s, isFocused: true)
+        #expect(s.modelInfo?.effort == "high")
+        SessionReducer.apply(HookEvent(appSessionId: id, kind: .sessionStart, payloadModel: "claude-sonnet-5-5"), to: &s, isFocused: true)
+        #expect(s.modelInfo == ModelInfo(model: "claude-sonnet-5-5", effort: nil))
+        // A resumed transcript with that model supplies the effort.
+        var e = HookEvent(appSessionId: id, kind: .sessionStart, payloadModel: "claude-sonnet-5-5")
+        e.modelInfo = ModelInfo(model: "claude-sonnet-5-5", effort: "low")
+        SessionReducer.apply(e, to: &s, isFocused: true)
+        #expect(s.modelInfo?.effort == "low")
+    }
+
+    @Test func transcriptExistence() throws {
+        let projects = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-projects-\(UUID())")
+        let dir = projects.appendingPathComponent("-Users-me-code-api")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data().write(to: dir.appendingPathComponent("abc.jsonl"))
+        #expect(ClaudeTranscripts.exists(sessionId: "abc", in: projects))
+        #expect(!ClaudeTranscripts.exists(sessionId: "never-messaged", in: projects))
+        #expect(!ClaudeTranscripts.exists(sessionId: "", in: projects))
+        #expect(!ClaudeTranscripts.exists(sessionId: "../x", in: projects))
+        let home = URL(fileURLWithPath: "/Users/me")
+        #expect(ClaudeTranscripts.projectsDirectory(environment: [:], home: home).path == "/Users/me/.claude/projects")
+        #expect(ClaudeTranscripts.projectsDirectory(environment: ["CLAUDE_CONFIG_DIR": "/cfg"], home: home).path == "/cfg/projects")
+    }
+}

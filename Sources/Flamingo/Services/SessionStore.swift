@@ -187,8 +187,11 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    private func launch(_ id: UUID, resume: Bool) {
+    private func launch(_ id: UUID, resume requested: Bool) {
         guard var s = session(id) else { return }
+        // Only resume a conversation Claude Code actually saved; a session that never got a
+        // message has an id but no transcript, and `claude --resume` would fail on it.
+        let resume = requested && (s.claudeSessionId.map { ClaudeTranscripts.exists(sessionId: $0) } ?? false)
         if !resume { s.claudeSessionId = nil }
         terminals.start(s, resume: resume)
         // Every project session start updates recents (blank sessions in ~ are skipped).

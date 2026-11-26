@@ -17,10 +17,12 @@ public struct HookEvent: Equatable, Sendable {
     public var cwd: String?
     public var message: String?
     public var transcriptPath: String?
+    /// The model Claude Code reports in the payload (SessionStart has it, before any answer).
+    public var payloadModel: String?
     /// Filled in off the main thread from the transcript's tail (see `HookEventWatcher`).
     public var modelInfo: ModelInfo?
 
-    public init(appSessionId: UUID, kind: Kind?, rawEventName: String? = nil, claudeSessionId: String? = nil, cwd: String? = nil, message: String? = nil, transcriptPath: String? = nil, modelInfo: ModelInfo? = nil) {
+    public init(appSessionId: UUID, kind: Kind?, rawEventName: String? = nil, claudeSessionId: String? = nil, cwd: String? = nil, message: String? = nil, transcriptPath: String? = nil, payloadModel: String? = nil, modelInfo: ModelInfo? = nil) {
         self.appSessionId = appSessionId
         self.kind = kind
         self.rawEventName = rawEventName ?? kind?.rawValue
@@ -28,6 +30,7 @@ public struct HookEvent: Equatable, Sendable {
         self.cwd = cwd
         self.message = message
         self.transcriptPath = transcriptPath
+        self.payloadModel = payloadModel
         self.modelInfo = modelInfo
     }
 
@@ -46,7 +49,8 @@ public struct HookEvent: Equatable, Sendable {
             claudeSessionId: sid,
             cwd: payload["cwd"] as? String,
             message: payload["message"] as? String,
-            transcriptPath: payload["transcript_path"] as? String
+            transcriptPath: payload["transcript_path"] as? String,
+            payloadModel: (payload["model"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 }
@@ -68,7 +72,13 @@ public enum SessionReducer {
     @discardableResult
     public static func apply(_ event: HookEvent, to s: inout Session, isFocused: Bool, now: Date = Date()) -> SessionAlert? {
         if let sid = event.claudeSessionId { s.claudeSessionId = sid }
-        if let info = event.modelInfo { s.modelInfo = info }
+        if let current = event.payloadModel {
+            // The payload names the model now in use; effort is only known from an answer with that model.
+            let effort = [event.modelInfo, s.modelInfo].compactMap { $0 }.first { $0.model == current }?.effort
+            s.modelInfo = ModelInfo(model: current, effort: effort)
+        } else if let info = event.modelInfo {
+            s.modelInfo = info
+        }
         s.lastActivity = now
         guard let kind = event.kind else { return nil }
 

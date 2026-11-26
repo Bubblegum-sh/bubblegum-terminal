@@ -86,3 +86,22 @@ public struct ModelInfo: Codable, Equatable, Sendable {
         return nil
     }
 }
+
+/// Claude Code's saved conversations: `<config dir>/projects/<mangled cwd>/<session id>.jsonl`.
+public enum ClaudeTranscripts {
+    /// `$CLAUDE_CONFIG_DIR/projects`, or `~/.claude/projects`.
+    public static func projectsDirectory(environment: [String: String] = ProcessInfo.processInfo.environment,
+                                         home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        let base = environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? home.appendingPathComponent(".claude", isDirectory: true)
+        return base.appendingPathComponent("projects", isDirectory: true)
+    }
+
+    /// Whether a conversation with this id was saved. Claude Code writes the file only after
+    /// the first message, so `claude --resume <id>` fails for a session that never got one.
+    public static func exists(sessionId: String, in projects: URL = projectsDirectory()) -> Bool {
+        guard !sessionId.isEmpty, !sessionId.contains("/"),
+              let dirs = try? FileManager.default.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil) else { return false }
+        return dirs.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent(sessionId + ".jsonl").path) }
+    }
+}
