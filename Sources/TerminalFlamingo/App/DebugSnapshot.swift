@@ -24,6 +24,8 @@ enum DebugSnapshot {
                 case "filter": store.newSessionFilter = "par"
                 case "close": store.closeNewSessionSheet()
                 case "ended": store.debugEnd()
+                case "askdelete": if let id = store.selectedId { store.requestDelete(id) }
+                case "delete": if let id = store.confirmDeleteId ?? store.selectedId { store.delete(id) }
                 case "hittest": hitTest(to: "\(prefix)-hits.txt")
                 default: break
                 }

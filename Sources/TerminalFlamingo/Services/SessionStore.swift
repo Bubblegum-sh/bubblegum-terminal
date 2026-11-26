@@ -230,6 +230,7 @@ final class SessionStore: ObservableObject {
     /// S-8: terminates the process and removes it; Claude's transcript on disk is untouched.
     func delete(_ id: UUID) {
         confirmDeleteId = nil
+        if renamingId == id { renamingId = nil }
         terminals.remove(id)
         notifier.clear(sessionId: id)
         let visible = visibleIds

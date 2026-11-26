@@ -58,8 +58,16 @@ struct ContentView: View {
             Button("Delete Session", role: .destructive) { if let id = store.confirmDeleteId { store.delete(id) } }
             Button("Cancel", role: .cancel) { store.confirmDeleteId = nil }
         } message: {
-            Text("The session is removed from Terminal Flamingo. Claude’s transcript on disk is not touched.")
+            Text(deleteMessage)
         }
+    }
+
+    /// S-8: the confirmation says when a running claude process will be stopped.
+    private var deleteMessage: String {
+        let base = "The session is removed from Terminal Flamingo. Claude’s transcript on disk is not touched."
+        guard let id = store.confirmDeleteId, store.terminals.isRunning(id) else { return base }
+        let working = store.session(id)?.status == .working
+        return (working ? "Claude is working. " : "") + "Its claude process will be stopped. " + base
     }
 
     private func applyTerminalAppearance() {

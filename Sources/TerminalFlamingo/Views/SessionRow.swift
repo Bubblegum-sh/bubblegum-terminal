@@ -130,6 +130,8 @@ struct SessionRow: View {
             Divider()
             Button("Restart Session") { store.requestRestart(session.id) }
             Button("Show in Finder") { store.showInFinder(session.id) }
+            Divider()
+            Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
         }
     }
 

@@ -35,6 +35,8 @@ struct AppCommands: Commands {
                 .disabled(s == nil)
             Button("Show in Finder") { store.showInFinder() }
                 .disabled(s == nil)
+            Button("Delete Session…") { if let id = s?.id { store.requestDelete(id) } }
+                .disabled(s == nil)
             Divider()
             Button("Quick Switcher…") { store.toggleQuickSwitcher() }
                 .keyboardShortcut("k", modifiers: .command)
