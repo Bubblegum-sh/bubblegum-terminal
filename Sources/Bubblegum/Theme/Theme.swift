@@ -48,7 +48,38 @@ struct Theme: Equatable {
         }
     }
 
+    /// Group colours (Main window: groups artboard). Light values are darker so group names
+    /// in the sidebar stay readable on the light sidebar.
+    func groupColor(_ c: GroupColor) -> NSColor {
+        switch (c, isDark) {
+        case (.pink, true): return .hex(0xFF5C8A)
+        case (.orange, true): return .hex(0xFF9F43)
+        case (.yellow, true): return .hex(0xF5C842)
+        case (.green, true): return .hex(0x3DD68C)
+        case (.teal, true): return .hex(0x2EC4C4)
+        case (.blue, true): return .hex(0x5B9BFF)
+        case (.purple, true): return .hex(0xB36BFF)
+        case (.gray, true): return .hex(0x8E8B96)
+        case (.pink, false): return .hex(0xD81B60)
+        case (.orange, false): return .hex(0xE07000)
+        case (.yellow, false): return .hex(0xB58B00)
+        case (.green, false): return .hex(0x0E8A50)
+        case (.teal, false): return .hex(0x00838F)
+        case (.blue, false): return .hex(0x2F6FE0)
+        case (.purple, false): return .hex(0x8A3FD9)
+        case (.gray, false): return .hex(0x6B6872)
+        }
+    }
+
+    /// Text and icons on destructive actions (Delete group).
+    var danger: NSColor { isDark ? .hex(0xFF6B6B) : .hex(0xC62828) }
+    /// Inline validation messages ("A group with this name already exists").
+    var warning: NSColor { isDark ? .hex(0xFF9F43) : .hex(0xB05A00) }
+
     // SwiftUI accessors
+    func groupC(_ c: GroupColor) -> Color { Color(nsColor: groupColor(c)) }
+    var dangerC: Color { Color(nsColor: danger) }
+    var warningC: Color { Color(nsColor: warning) }
     var windowC: Color { Color(nsColor: window) }
     var sidebarC: Color { Color(nsColor: sidebar) }
     var terminalC: Color { Color(nsColor: terminal) }
@@ -96,4 +127,18 @@ func terminalFont(size: CGFloat) -> NSFont {
     NSFont(name: "JetBrainsMono-Regular", size: size)
         ?? NSFont(name: "JetBrains Mono", size: size)
         ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+}
+
+/// Group colour mark: a rounded square, so it isn't confused with the round status dots.
+struct GroupSwatch: View {
+    let color: GroupColor
+    var size: CGFloat = 9
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size / 3)
+            .fill(theme.groupC(color))
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
 }
