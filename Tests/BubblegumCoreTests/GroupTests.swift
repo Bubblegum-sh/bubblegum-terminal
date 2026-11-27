@@ -131,3 +131,56 @@ import Testing
         #expect(s[4].groupId == nil && s[4].isArchived) // archived members are ungrouped too
     }
 }
+
+@Suite struct GroupSidebarTests {
+    @Test func groupsThenUngroupedThenArchived() {
+        let work = SessionGroup(name: "Work", color: .blue, order: 1)
+        let side = SessionGroup(name: "Side", color: .pink, order: 0)
+        let a = Session(name: "a", directory: "/a", groupId: work.id, order: 1)
+        let b = Session(name: "b", directory: "/b", groupId: work.id, order: 0)
+        let c = Session(name: "c", directory: "/c", groupId: side.id)
+        let d = Session(name: "d", directory: "/d")
+        let e = Session(name: "e", directory: "/e", isArchived: true, groupId: work.id)
+        let items = SidebarLayout.items(sessions: [a, b, c, d, e], groups: [work, side], query: "", archivedOpen: true)
+        #expect(items == [
+            .group(id: side.id, count: 1, isOpen: true, needsAttention: false), .row(c.id),
+            .group(id: work.id, count: 2, isOpen: true, needsAttention: false), .row(b.id), .row(a.id),
+            .ungrouped(count: 1), .row(d.id),
+            .newGroup,
+            .archivedToggle(count: 1, isOpen: true), .row(e.id),
+        ])
+        #expect(Set(items.map(\.id)).count == items.count)
+        #expect(SidebarLayout.visibleIds(items) == [c.id, b.id, a.id, d.id, e.id])
+    }
+
+    @Test func collapsedGroupHidesRowsAndShowsAttention() {
+        var work = SessionGroup(name: "Work", color: .blue, isCollapsed: true)
+        let quiet = Session(name: "quiet", directory: "/q", groupId: work.id)
+        var waiting = Session(name: "waiting", directory: "/w", groupId: work.id, status: .waiting)
+        let unread = Session(name: "unread", directory: "/u", unread: true, groupId: work.id)
+        func head(_ sessions: [Session]) -> SidebarItem? {
+            SidebarLayout.items(sessions: sessions, groups: [work], query: "", archivedOpen: true).first
+        }
+        #expect(head([quiet]) == .group(id: work.id, count: 1, isOpen: false, needsAttention: false))
+        #expect(head([quiet, waiting]) == .group(id: work.id, count: 2, isOpen: false, needsAttention: true))
+        #expect(head([unread]) == .group(id: work.id, count: 1, isOpen: false, needsAttention: true))
+        // An archived session that is unread doesn't light up the group.
+        waiting.status = .idle
+        var archivedUnread = unread
+        archivedUnread.isArchived = true
+        #expect(head([waiting, archivedUnread]) == .group(id: work.id, count: 1, isOpen: false, needsAttention: false))
+        // Expanded: no indicator on the heading.
+        work.isCollapsed = false
+        #expect(head([unread]) == .group(id: work.id, count: 1, isOpen: true, needsAttention: false))
+        let items = SidebarLayout.items(sessions: [quiet], groups: [work], query: "", archivedOpen: true)
+        #expect(SidebarLayout.visibleIds(items) == [quiet.id])
+    }
+
+    @Test func searchIsFlatAcrossGroups() {
+        let work = SessionGroup(name: "Work", color: .blue)
+        let a = Session(name: "api", directory: "/a", groupId: work.id)
+        let b = Session(name: "app", directory: "/b")
+        let items = SidebarLayout.items(sessions: [a, b], groups: [work], query: "ap", archivedOpen: true)
+        #expect(items == [.label("Results · 2"), .row(a.id), .row(b.id)])
+    }
+}

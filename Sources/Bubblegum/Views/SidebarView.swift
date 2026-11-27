@@ -130,6 +130,13 @@ struct SidebarView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
                 .padding(.horizontal, 8)
+        case .ungrouped(let count):
+            GroupLabel(text: "Ungrouped · \(count)")
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+                .padding(.horizontal, 8)
+        case .group, .newGroup:
+            EmptyView()
         case .archivedToggle(let count, let isOpen):
             Button {
                 store.archivedOpen.toggle()

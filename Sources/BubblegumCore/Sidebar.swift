@@ -2,13 +2,24 @@ import Foundation
 
 /// One line of the sidebar list.
 public enum SidebarItem: Equatable, Identifiable {
+    /// Search results heading ("Results · N", "No sessions match").
     case label(String)
+    /// A user group's heading. `needsAttention` is only set while the group is collapsed:
+    /// an expanded group shows no indicator (its rows show their own).
+    case group(id: UUID, count: Int, isOpen: Bool, needsAttention: Bool)
+    /// Fixed "Ungrouped · N" heading below the user groups.
+    case ungrouped(count: Int)
+    /// "New group…" button at the end of the group list.
+    case newGroup
     case archivedToggle(count: Int, isOpen: Bool)
     case row(UUID)
 
     public var id: String {
         switch self {
         case .label(let s): return "label:" + s
+        case .group(let id, _, _, _): return "group:" + id.uuidString
+        case .ungrouped: return "ungrouped"
+        case .newGroup: return "new-group"
         case .archivedToggle: return "archived-toggle"
         case .row(let id): return id.uuidString
         }
@@ -16,9 +27,10 @@ public enum SidebarItem: Equatable, Identifiable {
 }
 
 public enum SidebarLayout {
-    /// L-1 groups (Sessions · N, Archived · N), or F-1 results when a query is set.
-    /// Order inside groups is the order of `sessions` (creation order, L-8).
-    public static func items(sessions: [Session], query: String, archivedOpen: Bool) -> [SidebarItem] {
+    /// User groups (by order), then Ungrouped, the New group button, then Archived.
+    /// Rows inside a group follow `Session.order`; archived rows keep creation order.
+    /// With a query set, a flat list of results instead (F-1).
+    public static func items(sessions: [Session], groups: [SessionGroup] = [], query: String, archivedOpen: Bool) -> [SidebarItem] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if !q.isEmpty {
             let hits = sessions.filter { matches($0, query: q) }
@@ -27,11 +39,20 @@ public enum SidebarLayout {
             return items
         }
 
-        let active = sessions.filter { !$0.isArchived }
-        let archived = sessions.filter { $0.isArchived }
+        var items: [SidebarItem] = []
+        for g in GroupOps.sorted(groups) {
+            let members = GroupOps.members(of: g.id, in: sessions)
+            let open = !g.isCollapsed
+            let attention = !open && members.contains { $0.unread || $0.status == .waiting }
+            items.append(.group(id: g.id, count: members.count, isOpen: open, needsAttention: attention))
+            if open { items += members.map { .row($0.id) } }
+        }
+        let loose = GroupOps.members(of: nil, in: sessions)
+        items.append(.ungrouped(count: loose.count))
+        items += loose.map { .row($0.id) }
+        items.append(.newGroup)
 
-        var items: [SidebarItem] = [.label("Sessions · \(active.count)")]
-        items += active.map { .row($0.id) }
+        let archived = sessions.filter { $0.isArchived }
         if !archived.isEmpty {
             items.append(.archivedToggle(count: archived.count, isOpen: archivedOpen))
             if archivedOpen { items += archived.map { .row($0.id) } }
