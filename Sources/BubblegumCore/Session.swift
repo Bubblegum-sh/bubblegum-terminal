@@ -46,6 +46,10 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
     public var unread: Bool
     /// Model and effort from the last answer (persisted so it shows after relaunch).
     public var modelInfo: ModelInfo?
+    /// The session's group; nil means Ungrouped.
+    public var groupId: UUID?
+    /// Position inside its group (manual order). Ties keep the order of the sessions array.
+    public var order: Int
 
     // Runtime only (excluded from CodingKeys).
     public var terminalTitle: String?
@@ -56,7 +60,7 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         // Files written before pinning was removed may still contain "isPinned"; it is ignored.
-        case id, name, directory, claudeSessionId, isArchived, createdAt, lastActivity, unread, modelInfo
+        case id, name, directory, claudeSessionId, isArchived, createdAt, lastActivity, unread, modelInfo, groupId, order
     }
 
     /// Only id, name and directory are required, so files from older or newer versions
@@ -72,6 +76,8 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
         lastActivity = (try? c.decodeIfPresent(Date.self, forKey: .lastActivity)) ?? createdAt
         unread = try c.decodeIfPresent(Bool.self, forKey: .unread) ?? false
         modelInfo = try? c.decodeIfPresent(ModelInfo.self, forKey: .modelInfo)
+        groupId = try? c.decodeIfPresent(UUID.self, forKey: .groupId)
+        order = (try? c.decodeIfPresent(Int.self, forKey: .order)) ?? 0
     }
 
     public init(
@@ -83,6 +89,8 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
         createdAt: Date = Date(),
         lastActivity: Date? = nil,
         unread: Bool = false,
+        groupId: UUID? = nil,
+        order: Int = 0,
         status: SessionStatus = .paused
     ) {
         self.id = id
@@ -93,6 +101,8 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
         self.createdAt = createdAt
         self.lastActivity = lastActivity ?? createdAt
         self.unread = unread
+        self.groupId = groupId
+        self.order = order
         self.status = status
     }
 
