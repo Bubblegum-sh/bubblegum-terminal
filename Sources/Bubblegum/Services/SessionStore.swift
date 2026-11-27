@@ -48,10 +48,16 @@ final class SessionStore: ObservableObject {
         self.paths = paths
         self.installer = HookInstaller(paths: paths)
         LegacyMigration.run(paths: paths) // from "Flamingo" / "Terminal Flamingo": data folder + hook paths
-        if let state = PersistedState.load(from: paths.sessionsFile) {
+        installer.updateScriptIfOutdated()
+        let loaded = PersistedState.loadForApp(from: paths.sessionsFile)
+        if let state = loaded.state {
             sessions = state.sessions.map { var s = $0; s.status = .paused; return s }
             selectedId = state.selectedId.flatMap { id in sessions.contains { $0.id == id } ? id : nil }
             archivedOpen = state.archivedOpen
+        }
+        if let backup = loaded.backup {
+            let what = loaded.state == nil ? "Saved sessions couldn’t be read" : "Some saved sessions couldn’t be read"
+            showError(what, "The original file was kept at \(Session.abbreviate(backup.path)).")
         }
         if selectedId == nil { selectedId = sessions.first { !$0.isArchived }?.id }
         recents = RecentProjects.load(from: paths.recentsFile)

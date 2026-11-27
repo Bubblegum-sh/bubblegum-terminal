@@ -92,26 +92,42 @@ public enum Git {
 
     static func run(_ args: [String], in directory: String) -> Output? {
         guard let git = executable else { return nil }
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: git)
-        p.arguments = args
-        p.currentDirectoryURL = URL(fileURLWithPath: directory, isDirectory: true)
         var env = ProcessInfo.processInfo.environment
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["GIT_OPTIONAL_LOCKS"] = "0" // don't fight Claude's own git commands for index.lock
         env["LC_ALL"] = "C"
-        p.environment = env
+        return runProcess(git, args, in: directory, environment: env)
+    }
+
+    /// Runs a program to completion and collects its output.
+    static func runProcess(_ executable: String, _ args: [String], in directory: String, environment: [String: String]? = nil) -> Output? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: executable)
+        p.arguments = args
+        p.currentDirectoryURL = URL(fileURLWithPath: directory, isDirectory: true)
+        if let environment { p.environment = environment }
         let out = Pipe(), err = Pipe()
         p.standardOutput = out
         p.standardError = err
         p.standardInput = FileHandle.nullDevice
         do { try p.run() } catch { return nil }
-        // Read before waiting so a full pipe can't block git.
+        // Drain both pipes at once before waiting: reading one to the end while the other
+        // fills (64 KB) would leave git blocked on the full pipe and us blocked on the read.
+        let errData = DataBox()
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .utility).async {
+            errData.value = err.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
         let o = out.fileHandleForReading.readDataToEndOfFile()
-        let e = err.fileHandleForReading.readDataToEndOfFile()
+        group.wait()
         p.waitUntilExit()
-        return Output(status: p.terminationStatus, out: String(decoding: o, as: UTF8.self), err: String(decoding: e, as: UTF8.self))
+        return Output(status: p.terminationStatus, out: String(decoding: o, as: UTF8.self), err: String(decoding: errData.value, as: UTF8.self))
     }
+
+    /// Written on one thread, read after `DispatchGroup.wait()` on another.
+    private final class DataBox: @unchecked Sendable { var value = Data() }
 
     // MARK: Queries
 

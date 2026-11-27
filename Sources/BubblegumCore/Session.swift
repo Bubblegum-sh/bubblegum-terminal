@@ -59,6 +59,21 @@ public struct Session: Identifiable, Equatable, Codable, Sendable {
         case id, name, directory, claudeSessionId, isArchived, createdAt, lastActivity, unread, modelInfo
     }
 
+    /// Only id, name and directory are required, so files from older or newer versions
+    /// (missing or extra fields) still load instead of failing the whole sessions.json.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        directory = try c.decode(String.self, forKey: .directory)
+        claudeSessionId = try c.decodeIfPresent(String.self, forKey: .claudeSessionId)
+        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
+        lastActivity = (try? c.decodeIfPresent(Date.self, forKey: .lastActivity)) ?? createdAt
+        unread = try c.decodeIfPresent(Bool.self, forKey: .unread) ?? false
+        modelInfo = try? c.decodeIfPresent(ModelInfo.self, forKey: .modelInfo)
+    }
+
     public init(
         id: UUID = UUID(),
         name: String,

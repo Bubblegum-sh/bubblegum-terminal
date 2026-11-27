@@ -70,11 +70,87 @@ public struct PersistedState: Codable, Equatable {
         self.archivedOpen = archivedOpen
     }
 
+    enum CodingKeys: String, CodingKey { case sessions, selectedId, archivedOpen }
+
+    /// Sessions that can't be decoded are skipped (counted in `skippedSessions`) rather than
+    /// failing the whole file; the top level only needs a `sessions` array.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        var list = try c.nestedUnkeyedContainer(forKey: .sessions)
+        var sessions: [Session] = []
+        var skipped = 0
+        while !list.isAtEnd {
+            if let s = try? list.decode(Session.self) {
+                sessions.append(s)
+            } else {
+                skipped += 1
+                _ = try? list.decode(Skip.self) // advance past the bad element
+            }
+        }
+        self.sessions = sessions
+        self.skippedSessions = skipped
+        selectedId = try? c.decodeIfPresent(UUID.self, forKey: .selectedId)
+        archivedOpen = (try? c.decodeIfPresent(Bool.self, forKey: .archivedOpen)) ?? true
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(sessions, forKey: .sessions)
+        try c.encodeIfPresent(selectedId, forKey: .selectedId)
+        try c.encode(archivedOpen, forKey: .archivedOpen)
+    }
+
+    /// Not persisted: how many sessions in the loaded file could not be read.
+    public private(set) var skippedSessions = 0
+
+    /// Accepts any JSON value, so the container moves on to the next element.
+    private struct Skip: Decodable { init(from decoder: Decoder) {} }
+
+    public static func == (a: PersistedState, b: PersistedState) -> Bool {
+        a.sessions == b.sessions && a.selectedId == b.selectedId && a.archivedOpen == b.archivedOpen
+    }
+
+    /// Parses sessions.json. nil when the file is missing or unreadable; never touches the file.
     public static func load(from url: URL) -> PersistedState? {
         guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? decode(data)
+    }
+
+    static func decode(_ data: Data) throws -> PersistedState {
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
-        return try? dec.decode(PersistedState.self, from: data)
+        return try dec.decode(PersistedState.self, from: data)
+    }
+
+    public struct LoadResult {
+        public var state: PersistedState?
+        /// Where a copy of an unreadable (or partly unreadable) file was kept, if one was.
+        public var backup: URL?
+    }
+
+    /// Loads sessions.json for the app. The next save overwrites the file, so when it can't be
+    /// read (or some sessions can't), the original is kept as `sessions.json.unreadable-<date>`
+    /// first instead of being lost.
+    public static func loadForApp(from url: URL, now: Date = Date()) -> LoadResult {
+        guard let data = try? Data(contentsOf: url) else { return LoadResult() }
+        let state = try? decode(data)
+        guard state == nil || state!.skippedSessions > 0 else { return LoadResult(state: state) }
+        return LoadResult(state: state, backup: keepCopy(of: url, now: now))
+    }
+
+    static func keepCopy(of url: URL, now: Date) -> URL? {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        let backup = url.deletingLastPathComponent()
+            .appendingPathComponent(url.lastPathComponent + ".unreadable-" + f.string(from: now))
+        do {
+            try FileManager.default.copyItem(at: url, to: backup)
+            return backup
+        } catch {
+            NSLog("Bubblegum: could not keep a copy of \(url.path): \(error)")
+            return nil
+        }
     }
 
     public func save(to url: URL) throws {

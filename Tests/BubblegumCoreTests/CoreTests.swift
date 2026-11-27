@@ -106,9 +106,9 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func scriptWritesEventOnlyWithSessionId() throws {
         let p = tempPaths()
         try HookInstaller(paths: p).writeScript()
-        let home = p.supportDirectory.deletingLastPathComponent().deletingLastPathComponent()
-        // The script hardcodes $HOME/Library/Application Support/...; point HOME at a fake layout.
-        let fakeSupport = home.appendingPathComponent("Library/Application Support/Bubblegum/events")
+        // HOME points somewhere unrelated: the script must write to the configured events folder.
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-home-\(UUID().uuidString)")
+        let fakeSupport = p.eventsDirectory
         func run(_ env: [String: String]) throws {
             let proc = Process()
             proc.executableURL = p.hookScript
@@ -128,6 +128,21 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         let events = HookEventWatcher.drain(directory: fakeSupport)
         #expect(events == [HookEvent(appSessionId: id, kind: .stop, claudeSessionId: "abc")])
         #expect(HookEventWatcher.drain(directory: fakeSupport).isEmpty) // files deleted
+    }
+
+    @Test func scriptQuotesEventsPathAndOutdatedScriptIsRewritten() throws {
+        let p = tempPaths()
+        let inst = HookInstaller(paths: p)
+        #expect(!inst.updateScriptIfOutdated()) // nothing installed: nothing to do
+        #expect(inst.script.contains("DIR='\(p.eventsDirectory.path)'"))
+        #expect(HookInstaller.script(eventsDirectory: URL(fileURLWithPath: "/a/it's")).contains(#"DIR='/a/it'\''s'"#))
+
+        try inst.writeScript()
+        #expect(!inst.updateScriptIfOutdated()) // already current
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: p.hookScript)
+        #expect(inst.updateScriptIfOutdated())
+        #expect(try String(contentsOf: p.hookScript, encoding: .utf8) == inst.script)
+        #expect(FileManager.default.isExecutableFile(atPath: p.hookScript.path))
     }
 }
 
@@ -283,6 +298,42 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         let loaded = try #require(PersistedState.load(from: url))
         #expect(loaded.sessions.map(\.id) == [id])
         #expect(SidebarLayout.items(sessions: loaded.sessions, query: "", archivedOpen: true) == [.label("Sessions · 1"), .row(id)])
+    }
+
+    @Test func toleratesMissingFieldsAndSkipsBadSessions() throws {
+        let good = UUID()
+        let json = #"{"sessions":[{"id":"\#(good.uuidString)","name":"api","directory":"/code/api"},{"name":"no id"},"junk",{"id":"\#(UUID().uuidString)","name":"bad date","directory":"/x","createdAt":"never","isArchived":"yes"}],"selectedId":"\#(good.uuidString)"}"#
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-load-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("sessions.json")
+        try Data(json.utf8).write(to: url)
+
+        let r = PersistedState.loadForApp(from: url)
+        let state = try #require(r.state)
+        #expect(state.sessions.map(\.id) == [good])
+        #expect(state.sessions[0].isArchived == false && state.sessions[0].unread == false)
+        #expect(state.skippedSessions == 3)
+        #expect(state.selectedId == good && state.archivedOpen)
+        let backup = try #require(r.backup)
+        #expect(try Data(contentsOf: backup) == Data(json.utf8)) // original kept before the next save
+    }
+
+    @Test func unreadableFileIsKeptAndCleanFileIsNotCopied() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-load-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("sessions.json")
+        #expect(PersistedState.loadForApp(from: url).state == nil) // missing: no backup
+        #expect(PersistedState.loadForApp(from: url).backup == nil)
+
+        try Data("{not json".utf8).write(to: url)
+        let r = PersistedState.loadForApp(from: url, now: Date(timeIntervalSince1970: 0))
+        #expect(r.state == nil)
+        #expect(r.backup?.lastPathComponent.hasPrefix("sessions.json.unreadable-") == true)
+        #expect(try Data(contentsOf: #require(r.backup)) == Data("{not json".utf8))
+
+        try PersistedState(sessions: [Session(name: "a", directory: "/a")]).save(to: url)
+        let ok = PersistedState.loadForApp(from: url)
+        #expect(ok.state?.sessions.count == 1 && ok.backup == nil)
     }
 
     @Test func titleCleanup() {
@@ -682,6 +733,14 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 }
 
 @Suite struct GitIntegrationTests {
+    @Test(.timeLimit(.minutes(1))) func largeStderrDoesNotDeadlock() throws {
+        // 200 KB on stderr, well past the 64 KB pipe buffer, while stdout stays open.
+        let r = try #require(Git.runProcess("/bin/sh", ["-c", "head -c 200000 /dev/zero | tr '\\0' e >&2; echo done"], in: "/tmp"))
+        #expect(r.status == 0)
+        #expect(r.out == "done\n")
+        #expect(r.err.count == 200_000)
+    }
+
     @Test func statusBranchesSwitchCreate() throws {
         guard Git.executable != nil else { return }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-git-\(UUID().uuidString)").path

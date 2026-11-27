@@ -71,18 +71,24 @@ public struct HookInstaller: Sendable {
     /// "TerminalFlamingo/hook.sh"); they are ours too and get replaced on install.
     public static let legacyMarkers = ["Flamingo/hook.sh"]
 
-    public static let script = """
-    #!/bin/sh
-    [ -n "$BUBBLEGUM_SESSION_ID" ] || exit 0
-    DIR="$HOME/Library/Application Support/Bubblegum/events"
-    mkdir -p "$DIR" || exit 0
-    PAYLOAD=$(cat)
-    [ -n "$PAYLOAD" ] || PAYLOAD=null
-    TMP="$DIR/.$$.tmp"
-    printf '{"bubblegum":"%s","payload":%s}\\n' "$BUBBLEGUM_SESSION_ID" "$PAYLOAD" > "$TMP" && mv "$TMP" "$DIR/$(date +%s)-$$.json"
-    exit 0
+    /// The hook script. The events folder is written in (shell-quoted) from `AppPaths`, so it
+    /// always matches the folder the app watches, including `BUBBLEGUM_SUPPORT_DIR` dev runs.
+    public static func script(eventsDirectory: URL) -> String {
+        """
+        #!/bin/sh
+        [ -n "$BUBBLEGUM_SESSION_ID" ] || exit 0
+        DIR=\(LaunchCommand.shellQuote(eventsDirectory.path))
+        mkdir -p "$DIR" || exit 0
+        PAYLOAD=$(cat)
+        [ -n "$PAYLOAD" ] || PAYLOAD=null
+        TMP="$DIR/.$$.tmp"
+        printf '{"bubblegum":"%s","payload":%s}\\n' "$BUBBLEGUM_SESSION_ID" "$PAYLOAD" > "$TMP" && mv "$TMP" "$DIR/$(date +%s)-$$.json"
+        exit 0
 
-    """
+        """
+    }
+
+    public var script: String { Self.script(eventsDirectory: paths.eventsDirectory) }
 
     public var paths: AppPaths
 
@@ -151,10 +157,22 @@ public struct HookInstaller: Sendable {
         do {
             try fm.createDirectory(at: paths.supportDirectory, withIntermediateDirectories: true)
             try fm.createDirectory(at: paths.eventsDirectory, withIntermediateDirectories: true)
-            try Data(Self.script.utf8).write(to: paths.hookScript, options: .atomic)
+            try Data(script.utf8).write(to: paths.hookScript, options: .atomic)
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: paths.hookScript.path)
         } catch {
             throw HookInstallError.io("Could not write the hook script: \(error.localizedDescription)")
+        }
+    }
+
+    /// Rewrites an installed hook script whose contents differ from this version's (e.g. one
+    /// written before the events folder came from `AppPaths`). Does nothing when none is
+    /// installed. Returns true when it rewrote the script.
+    @discardableResult
+    public func updateScriptIfOutdated() -> Bool {
+        guard let current = try? Data(contentsOf: paths.hookScript), current != Data(script.utf8) else { return false }
+        do { try writeScript(); return true } catch {
+            NSLog("Bubblegum: could not update the hook script: \(error)")
+            return false
         }
     }
 
