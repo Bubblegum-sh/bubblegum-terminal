@@ -97,10 +97,13 @@ public struct PersistedState: Codable, Equatable {
             }
         }
         self.groups = groups
-        // A session whose group is gone goes back to Ungrouped.
+        // A session whose group is gone goes back to Ungrouped, after the sessions already there.
         let known = Set(groups.map(\.id))
+        var next = GroupOps.nextOrder(in: nil, sessions: sessions)
         for i in sessions.indices where sessions[i].groupId.map({ !known.contains($0) }) == true {
             sessions[i].groupId = nil
+            sessions[i].order = next
+            next += 1
         }
         self.sessions = sessions
         self.skippedSessions = skipped

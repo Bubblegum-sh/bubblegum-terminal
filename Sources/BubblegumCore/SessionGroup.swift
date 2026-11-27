@@ -96,11 +96,12 @@ public enum GroupOps {
     }
 
     /// Moves a session into `groupId` (nil = Ungrouped), just before `before` (nil = at the end).
-    /// An archived session is unarchived. The target group's orders are renumbered 0…n-1.
+    /// An archived session is unarchived. Every session of the target group, archived ones too,
+    /// is renumbered 0…n-1, so order values never clash.
     public static func move(_ id: UUID, to groupId: UUID?, before: UUID? = nil, sessions: inout [Session]) {
         guard before != id, let i = sessions.firstIndex(where: { $0.id == id }) else { return }
         sessions[i].isArchived = false
-        var list = members(of: groupId, in: sessions).map(\.id).filter { $0 != id }
+        var list = allMembers(of: groupId, in: sessions).map(\.id).filter { $0 != id }
         let at = before.flatMap { list.firstIndex(of: $0) } ?? list.count
         list.insert(id, at: at)
         sessions[i].groupId = groupId
@@ -120,8 +121,8 @@ public enum GroupOps {
         }
     }
 
-    /// Every session of the group (archived ones too), in its group order.
-    public static func allMembers(of groupId: UUID, in sessions: [Session]) -> [Session] {
+    /// Every session of the group (nil = Ungrouped), archived ones too, in its group order.
+    public static func allMembers(of groupId: UUID?, in sessions: [Session]) -> [Session] {
         sessions.enumerated()
             .filter { $0.element.groupId == groupId }
             .sorted { ($0.element.order, $0.offset) < ($1.element.order, $1.offset) }

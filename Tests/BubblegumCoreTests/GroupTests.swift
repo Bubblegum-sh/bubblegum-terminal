@@ -239,3 +239,33 @@ import Testing
         #expect(drop(.group(work.id), .row(c.id)) == nil)
     }
 }
+
+@Suite struct OrderTests {
+    @Test func moveRenumbersArchivedMembersToo() {
+        let work = SessionGroup(name: "Work")
+        // e is archived with order 0, which clashes with a's.
+        var s = [
+            Session(name: "a", directory: "/a", groupId: work.id, order: 0),
+            Session(name: "e", directory: "/e", isArchived: true, groupId: work.id, order: 0),
+            Session(name: "c", directory: "/c"),
+        ]
+        GroupOps.move(s[2].id, to: work.id, sessions: &s)
+        let orders = s.filter { $0.groupId == work.id }.map(\.order)
+        #expect(Set(orders).count == orders.count) // no clashes
+        // Unarchiving e later puts it back where it was relative to a, before c.
+        s[1].isArchived = false
+        #expect(GroupOps.members(of: work.id, in: s).map(\.name) == ["a", "e", "c"])
+    }
+
+    @Test func orphansGoAfterUngroupedSessionsOnLoad() throws {
+        let json = """
+        {"sessions": [
+          {"id": "\(UUID())", "name": "loose", "directory": "/l", "order": 4},
+          {"id": "\(UUID())", "name": "orphan", "directory": "/o", "groupId": "\(UUID())", "order": 0}
+        ]}
+        """
+        let state = try PersistedState.decode(Data(json.utf8))
+        #expect(GroupOps.members(of: nil, in: state.sessions).map(\.name) == ["loose", "orphan"])
+        #expect(state.sessions[1].order == 5)
+    }
+}
