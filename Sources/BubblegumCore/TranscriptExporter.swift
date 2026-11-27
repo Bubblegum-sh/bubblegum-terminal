@@ -101,7 +101,7 @@ public enum TranscriptExporter {
             s += "- **Model:** \(model.displayModel)" + (model.effortLabel.map { " · \($0) effort" } ?? "") + "\n"
         }
         if let id = m.claudeSessionId { s += "- **Claude session:** `\(id)`\n" }
-        s += "- **Exported:** \(formatDateTime(m.exportedAt, timeZone)) from Flamingo\n\n---\n"
+        s += "- **Exported:** \(formatDateTime(m.exportedAt, timeZone)) from Bubblegum\n\n---\n"
         return s
     }
 

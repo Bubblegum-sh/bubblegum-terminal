@@ -1,5 +1,5 @@
 import SwiftUI
-import FlamingoCore
+import BubblegumCore
 
 /// F-2: ⌘K palette. ↑↓ select, ↩ open, ⌘R rename, esc close.
 struct QuickSwitcherView: View {

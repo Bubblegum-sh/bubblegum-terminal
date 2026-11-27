@@ -1,5 +1,5 @@
 import SwiftUI
-import FlamingoCore
+import BubblegumCore
 
 /// One sidebar row (L-2, L-3): status dot, name, subtitle, and time/unread or inline actions.
 struct SessionRow: View {

@@ -40,7 +40,7 @@ public enum LaunchCommand {
         "CLAUDECODE", "CLAUDE_PID", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_EXECPATH",
         "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED",
         "CLAUDE_CODE_CHILD_NOTES_DIR", "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN",
-        "CLAUDE_CODE_SSE_PORT", "FLAMINGO_SESSION_ID",
+        "CLAUDE_CODE_SSE_PORT", "BUBBLEGUM_SESSION_ID", "FLAMINGO_SESSION_ID",
     ]
 
     /// Environment for the child: the app's environment plus terminal and session variables.
@@ -51,8 +51,8 @@ public enum LaunchCommand {
         for key in inheritedSessionMarkers { env.removeValue(forKey: key) }
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
-        env["TERM_PROGRAM"] = "Flamingo"
-        env["FLAMINGO_SESSION_ID"] = sessionId.uuidString
+        env["TERM_PROGRAM"] = "Bubblegum"
+        env["BUBBLEGUM_SESSION_ID"] = sessionId.uuidString
         env["LANG"] = env["LANG"] ?? "en_US.UTF-8"
         return env.map { "\($0.key)=\($0.value)" }.sorted()
     }

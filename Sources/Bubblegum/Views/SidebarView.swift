@@ -1,5 +1,5 @@
 import SwiftUI
-import FlamingoCore
+import BubblegumCore
 
 struct SidebarView: View {
     @EnvironmentObject private var store: SessionStore

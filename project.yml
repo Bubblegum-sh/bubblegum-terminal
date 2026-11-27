@@ -1,8 +1,8 @@
-# XcodeGen spec: `xcodegen generate` creates Flamingo.xcodeproj.
+# XcodeGen spec: `xcodegen generate` creates Bubblegum.xcodeproj.
 # SwiftPM (Package.swift + scripts/build-app.sh) builds the same sources without Xcode projects.
-name: Flamingo
+name: Bubblegum
 options:
-  bundleIdPrefix: dev.flamingo
+  bundleIdPrefix: dev.bubblegum
   deploymentTarget:
     macOS: "14.0"
 packages:
@@ -14,36 +14,36 @@ settings:
     SWIFT_VERSION: "5.10"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 targets:
-  FlamingoCore:
+  BubblegumCore:
     type: framework
     platform: macOS
-    sources: [Sources/FlamingoCore]
+    sources: [Sources/BubblegumCore]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.flamingo.core
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bubblegum.core
         GENERATE_INFOPLIST_FILE: YES
-  Flamingo:
+  Bubblegum:
     type: application
     platform: macOS
     sources:
-      - Sources/Flamingo
+      - Sources/Bubblegum
       - Resources/Assets.xcassets
     dependencies:
-      - target: FlamingoCore
+      - target: BubblegumCore
       - package: SwiftTerm
     settings:
       base:
-        PRODUCT_NAME: Flamingo
-        PRODUCT_BUNDLE_IDENTIFIER: dev.flamingo.app
+        PRODUCT_NAME: Bubblegum
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bubblegum.app
         INFOPLIST_FILE: Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_IDENTITY: "-"
-  FlamingoCoreTests:
+  BubblegumCoreTests:
     type: bundle.unit-test
     platform: macOS
-    sources: [Tests/FlamingoCoreTests]
+    sources: [Tests/BubblegumCoreTests]
     dependencies:
-      - target: FlamingoCore
+      - target: BubblegumCore

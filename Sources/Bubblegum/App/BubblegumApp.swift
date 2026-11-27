@@ -2,11 +2,11 @@ import AppKit
 import SwiftUI
 
 @main
-struct FlamingoApp: App {
+struct BubblegumApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        Window("Flamingo", id: "main") {
+        Window("Bubblegum", id: "main") {
             ContentView()
                 .environmentObject(appDelegate.store)
                 .environmentObject(appDelegate.settings)
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Needed when run as a bare executable (`swift run`); a no-op inside the .app bundle.
         NSApp.setActivationPolicy(.regular)
         // Without a bundle (e.g. Run in Xcode) there is no AppIcon; use the drawn one for the Dock.
-        if Bundle.main.bundleURL.pathExtension != "app" { NSApp.applicationIconImage = FlamingoIcon.image(size: 512) }
+        if Bundle.main.bundleURL.pathExtension != "app" { NSApp.applicationIconImage = BubblegumIcon.image(size: 512) }
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 

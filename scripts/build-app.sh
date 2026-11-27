@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds "build/Flamingo.app" with SwiftPM and signs it ad-hoc.
+# Builds "build/Bubblegum.app" with SwiftPM and signs it ad-hoc.
 # Usage: scripts/build-app.sh [debug|release]   (default: release)
 set -eu
 
@@ -20,14 +20,14 @@ fi
 swift build -c "$CONFIG" --arch arm64 --arch x86_64 2>/dev/null || swift build -c "$CONFIG"
 BIN="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --show-bin-path 2>/dev/null || swift build -c "$CONFIG" --show-bin-path)"
 
-APP="build/Flamingo.app"
+APP="build/Bubblegum.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/Flamingo" "$APP/Contents/MacOS/Flamingo"
+cp "$BIN/Bubblegum" "$APP/Contents/MacOS/Bubblegum"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-# Version comes from Sources/FlamingoCore/AppVersion.swift (single source).
-VERSION="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/FlamingoCore/AppVersion.swift)"
-BUILD="$(sed -n 's/.*static let build = "\(.*\)".*/\1/p' Sources/FlamingoCore/AppVersion.swift)"
+# Version comes from Sources/BubblegumCore/AppVersion.swift (single source).
+VERSION="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/BubblegumCore/AppVersion.swift)"
+BUILD="$(sed -n 's/.*static let build = "\(.*\)".*/\1/p' Sources/BubblegumCore/AppVersion.swift)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 
 # Asset catalog (AppIcon + AccentColor, the brand pink used by system buttons).

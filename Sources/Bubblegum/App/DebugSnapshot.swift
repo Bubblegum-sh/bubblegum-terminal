@@ -1,15 +1,15 @@
 #if DEBUG
 import AppKit
-import FlamingoCore
+import BubblegumCore
 
-/// Development aid: `FLAMINGO_SNAPSHOT=/path/prefix` writes PNGs of the main window
-/// (optionally after toggling UI via `FLAMINGO_SNAPSHOT_STEPS`), then quits.
+/// Development aid: `BUBBLEGUM_SNAPSHOT=/path/prefix` writes PNGs of the main window
+/// (optionally after toggling UI via `BUBBLEGUM_SNAPSHOT_STEPS`), then quits.
 @MainActor
 enum DebugSnapshot {
     static func runIfRequested(store: SessionStore, settings: AppSettings) {
         let env = ProcessInfo.processInfo.environment
-        guard let prefix = env["FLAMINGO_SNAPSHOT"] else { return }
-        let steps = (env["FLAMINGO_SNAPSHOT_STEPS"] ?? "main").split(separator: ",").map(String.init)
+        guard let prefix = env["BUBBLEGUM_SNAPSHOT"] else { return }
+        let steps = (env["BUBBLEGUM_SNAPSHOT_STEPS"] ?? "main").split(separator: ",").map(String.init)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(6))
             for step in steps {
@@ -36,9 +36,9 @@ enum DebugSnapshot {
                     NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 600 })?.toggleFullScreen(nil)
                     try? await Task.sleep(for: .seconds(5))
                 case "exportmd":
-                    // Renders the selected session's transcript (or FLAMINGO_EXPORT_TRANSCRIPT) without a save panel.
+                    // Renders the selected session's transcript (or BUBBLEGUM_EXPORT_TRANSCRIPT) without a save panel.
                     if let s = store.selected {
-                        let url = env["FLAMINGO_EXPORT_TRANSCRIPT"].map { URL(fileURLWithPath: $0) }
+                        let url = env["BUBBLEGUM_EXPORT_TRANSCRIPT"].map { URL(fileURLWithPath: $0) }
                             ?? s.claudeSessionId.flatMap { ClaudeTranscripts.url(sessionId: $0) }
                         if let url, let data = try? Data(contentsOf: url) {
                             let md = TranscriptExporter.markdown(transcript: data, metadata: .init(title: s.name, directory: s.directory, model: s.modelInfo, claudeSessionId: s.claudeSessionId))

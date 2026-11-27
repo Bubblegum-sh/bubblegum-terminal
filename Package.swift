@@ -2,31 +2,31 @@
 import PackageDescription
 
 let package = Package(
-    name: "Flamingo",
+    name: "Bubblegum",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "Flamingo", targets: ["Flamingo"])
+        .executable(name: "Bubblegum", targets: ["Bubblegum"])
     ],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", from: "1.2.0")
     ],
     targets: [
         .target(
-            name: "FlamingoCore",
-            path: "Sources/FlamingoCore"
+            name: "BubblegumCore",
+            path: "Sources/BubblegumCore"
         ),
         .executableTarget(
-            name: "Flamingo",
+            name: "Bubblegum",
             dependencies: [
-                "FlamingoCore",
+                "BubblegumCore",
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ],
-            path: "Sources/Flamingo"
+            path: "Sources/Bubblegum"
         ),
         .testTarget(
-            name: "FlamingoCoreTests",
-            dependencies: ["FlamingoCore"],
-            path: "Tests/FlamingoCoreTests"
+            name: "BubblegumCoreTests",
+            dependencies: ["BubblegumCore"],
+            path: "Tests/BubblegumCoreTests"
         )
     ]
 )

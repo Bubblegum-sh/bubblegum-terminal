@@ -4,7 +4,7 @@ import Foundation
 /// Event-driven (DispatchSource on the directory), no polling.
 public final class HookEventWatcher: @unchecked Sendable {
     private let directory: URL
-    private let queue = DispatchQueue(label: "dev.flamingo.hook-events")
+    private let queue = DispatchQueue(label: "dev.bubblegum.hook-events")
     private var source: DispatchSourceFileSystemObject?
     private var fd: Int32 = -1
     private let handler: @MainActor ([HookEvent]) -> Void

@@ -8,7 +8,7 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button("About Flamingo") { About.show() }
+            Button("About Bubblegum") { About.show() }
         }
 
         CommandGroup(replacing: .newItem) {

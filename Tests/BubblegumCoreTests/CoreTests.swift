@@ -1,12 +1,12 @@
 import Foundation
 import Testing
-@testable import FlamingoCore
+@testable import BubblegumCore
 
 private func tempPaths() -> AppPaths {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-tests-\(UUID().uuidString)", isDirectory: true)
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-tests-\(UUID().uuidString)", isDirectory: true)
     // Mimic the real layout so the marker substring appears in the hook path.
     return AppPaths(
-        supportDirectory: base.appendingPathComponent("Application Support/Flamingo", isDirectory: true),
+        supportDirectory: base.appendingPathComponent("Application Support/Bubblegum", isDirectory: true),
         claudeDirectory: base.appendingPathComponent(".claude", isDirectory: true)
     )
 }
@@ -71,7 +71,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     }
 
     @Test func reinstallFromNonStandardPathDoesNotDuplicate() throws {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-odd-\(UUID().uuidString)")
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-odd-\(UUID().uuidString)")
         let p = AppPaths(supportDirectory: base.appendingPathComponent("support"), claudeDirectory: base.appendingPathComponent(".claude"))
         let inst = HookInstaller(paths: p)
         #expect(!inst.hookCommand.contains(HookInstaller.marker))
@@ -84,11 +84,11 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 
     @Test func devSupportDirNeverTargetsRealClaudeFolder() {
         let home = URL(fileURLWithPath: "/Users/me")
-        let dev = AppPaths.standard(environment: ["FLAMINGO_SUPPORT_DIR": "/tmp/tf"], home: home)
+        let dev = AppPaths.standard(environment: ["BUBBLEGUM_SUPPORT_DIR": "/tmp/tf"], home: home)
         #expect(dev.claudeSettings.path == "/tmp/tf/claude/settings.json")
         let real = AppPaths.standard(environment: [:], home: home)
         #expect(real.claudeSettings.path == "/Users/me/.claude/settings.json")
-        #expect(real.hookScript.path == "/Users/me/Library/Application Support/Flamingo/hook.sh")
+        #expect(real.hookScript.path == "/Users/me/Library/Application Support/Bubblegum/hook.sh")
     }
 
     @Test func notInstalledWhenAnEventIsMissing() throws {
@@ -108,7 +108,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         try HookInstaller(paths: p).writeScript()
         let home = p.supportDirectory.deletingLastPathComponent().deletingLastPathComponent()
         // The script hardcodes $HOME/Library/Application Support/...; point HOME at a fake layout.
-        let fakeSupport = home.appendingPathComponent("Library/Application Support/Flamingo/events")
+        let fakeSupport = home.appendingPathComponent("Library/Application Support/Bubblegum/events")
         func run(_ env: [String: String]) throws {
             let proc = Process()
             proc.executableURL = p.hookScript
@@ -124,7 +124,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         try run([:])
         #expect(HookEventWatcher.drain(directory: fakeSupport).isEmpty)
         let id = UUID()
-        try run(["FLAMINGO_SESSION_ID": id.uuidString])
+        try run(["BUBBLEGUM_SESSION_ID": id.uuidString])
         let events = HookEventWatcher.drain(directory: fakeSupport)
         #expect(events == [HookEvent(appSessionId: id, kind: .stop, claudeSessionId: "abc")])
         #expect(HookEventWatcher.drain(directory: fakeSupport).isEmpty) // files deleted
@@ -177,7 +177,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 
     @Test func parsesEventFile() {
         let id = UUID()
-        let json = #"{"flamingo":"\#(id.uuidString)","payload":{"hook_event_name":"Notification","session_id":"s9","cwd":"/x","message":"hi"}}"#
+        let json = #"{"bubblegum":"\#(id.uuidString)","payload":{"hook_event_name":"Notification","session_id":"s9","cwd":"/x","message":"hi"}}"#
         let e = HookEvent.parse(Data(json.utf8))
         #expect(e == HookEvent(appSessionId: id, kind: .notification, claudeSessionId: "s9", cwd: "/x", message: "hi"))
         #expect(HookEvent.parse(Data(#"{"tf":"nope","payload":null}"#.utf8)) == nil)
@@ -186,7 +186,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 }
 
 @Suite struct SidebarTests {
-    let a = Session(name: "Flamingo", directory: "/code/tf")
+    let a = Session(name: "Bubblegum", directory: "/code/tf")
     let b = Session(name: "Parser refactor", directory: "/code/parser")
     let c = Session(name: "Landing page", directory: "/code/landing")
     let d = Session(name: "Rust experiment", directory: "/code/rust", isArchived: true)
@@ -254,7 +254,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func environmentStripsParentSessionMarkers() {
         let id = UUID()
         let env = LaunchCommand.environment(sessionId: id, base: ["PATH": "/bin", "CLAUDECODE": "1", "CLAUDE_CODE_CHILD_SESSION": "x", "CLAUDE_CODE_USE_BEDROCK": "1"])
-        #expect(env.contains("FLAMINGO_SESSION_ID=\(id.uuidString)"))
+        #expect(env.contains("BUBBLEGUM_SESSION_ID=\(id.uuidString)"))
         #expect(env.contains("TERM=xterm-256color"))
         #expect(env.contains("COLORTERM=truecolor"))
         #expect(env.contains("CLAUDE_CODE_USE_BEDROCK=1"))
@@ -264,7 +264,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func persistenceRoundTripDropsRuntimeFields() throws {
         var s = Session(name: "x", directory: "/x", claudeSessionId: "c", isArchived: true, status: .working)
         s.terminalTitle = "title"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-\(UUID()).json")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-\(UUID()).json")
         try PersistedState(sessions: [s], selectedId: s.id, archivedOpen: false).save(to: url)
         let loaded = try #require(PersistedState.load(from: url))
         #expect(loaded.sessions[0].status == .paused)
@@ -278,7 +278,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func loadsSessionsSavedWithPinnedFlag() throws {
         let id = UUID()
         let legacy = #"{"archivedOpen":true,"sessions":[{"id":"\#(id.uuidString)","name":"api","directory":"/code/api","isPinned":true,"isArchived":false,"createdAt":"2026-11-26T10:00:00Z","lastActivity":"2026-11-26T10:00:00Z","unread":false}]}"#
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-legacy-\(UUID()).json")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-legacy-\(UUID()).json")
         try Data(legacy.utf8).write(to: url)
         let loaded = try #require(PersistedState.load(from: url))
         #expect(loaded.sessions.map(\.id) == [id])
@@ -333,7 +333,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func persistenceRoundTrip() throws {
         var r = RecentProjects()
         r.record(path: "/code/api", at: now, home: home)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-recents-\(UUID()).json")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-recents-\(UUID()).json")
         try r.save(to: url)
         #expect(RecentProjects.load(from: url) == r)
         #expect(RecentProjects.load(from: url.appendingPathExtension("missing")).entries.isEmpty)
@@ -359,14 +359,16 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 
 @Suite struct MigrationTests {
     func layout() -> (home: URL, paths: AppPaths) {
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-home-\(UUID().uuidString)")
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-home-\(UUID().uuidString)")
         return (home, AppPaths.standard(environment: [:], home: home))
     }
 
-    @Test func movesDataAndRewritesOldHookEntries() throws {
+    /// 0 = "Flamingo", 1 = "Terminal Flamingo".
+    @Test(arguments: [0, 1]) func movesDataAndRewritesOldHookEntries(previousName: Int) throws {
         let (home, paths) = layout()
         let fm = FileManager.default
-        let legacy = try #require(paths.legacySupportDirectory)
+        #expect(paths.legacySupportDirectories.map(\.lastPathComponent) == ["Flamingo", "TerminalFlamingo"])
+        let legacy = paths.legacySupportDirectories[previousName]
         try fm.createDirectory(at: legacy, withIntermediateDirectories: true)
         try Data("{}".utf8).write(to: legacy.appendingPathComponent("sessions.json"))
         // settings.json as the old app wrote it, plus an unrelated user hook and key.
@@ -395,7 +397,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
             #expect(!cmds.contains(oldCommand))
             #expect(cmds.filter { $0 == installer.hookCommand }.count == 1)
         }
-        #expect(String(decoding: try Data(contentsOf: paths.hookScript), as: UTF8.self).contains("FLAMINGO_SESSION_ID"))
+        #expect(String(decoding: try Data(contentsOf: paths.hookScript), as: UTF8.self).contains("BUBBLEGUM_SESSION_ID"))
         _ = home
     }
 
@@ -404,11 +406,22 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(LegacyMigration.run(paths: paths) == LegacyMigration.Result())
     }
 
-    @Test func parsesEventsFromBeforeTheRename() {
+    @Test(arguments: ["tf", "flamingo"]) func parsesEventsFromBeforeTheRename(key: String) {
         let id = UUID()
-        let e = HookEvent.parse(Data(#"{"tf":"\#(id.uuidString)","payload":{"hook_event_name":"Stop"}}"#.utf8))
+        let e = HookEvent.parse(Data(#"{"\#(key)":"\#(id.uuidString)","payload":{"hook_event_name":"Stop"}}"#.utf8))
         #expect(e?.appSessionId == id)
         #expect(e?.kind == .stop)
+    }
+
+    @Test func newestPreviousFolderWins() throws {
+        let (_, paths) = layout()
+        let fm = FileManager.default
+        for (i, dir) in paths.legacySupportDirectories.enumerated() {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("\(i)".utf8).write(to: dir.appendingPathComponent("marker"))
+        }
+        #expect(LegacyMigration.run(paths: paths).movedData)
+        #expect(String(decoding: try Data(contentsOf: paths.supportDirectory.appendingPathComponent("marker")), as: UTF8.self) == "0")
     }
 }
 
@@ -441,7 +454,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
             #"{"type":"last-prompt"}"#,
             "not json",
         ]
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-transcript-\(UUID()).jsonl")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-transcript-\(UUID()).jsonl")
         try Data(lines.joined(separator: "\n").utf8).write(to: url)
         #expect(ModelInfo.latest(inTranscript: url) == ModelInfo(model: "claude-opus-5-5", effort: "high"))
         // A small tail window that starts mid-line still finds a complete record.
@@ -456,7 +469,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 
     @Test func hookEventCarriesTranscriptAndUpdatesSession() {
         let id = UUID()
-        let e = HookEvent.parse(Data(#"{"flamingo":"\#(id.uuidString)","payload":{"hook_event_name":"Stop","transcript_path":"/tmp/t.jsonl"}}"#.utf8))
+        let e = HookEvent.parse(Data(#"{"bubblegum":"\#(id.uuidString)","payload":{"hook_event_name":"Stop","transcript_path":"/tmp/t.jsonl"}}"#.utf8))
         #expect(e?.transcriptPath == "/tmp/t.jsonl")
         var s = Session(id: id, name: "x", directory: "/x", status: .working)
         var ev = e!
@@ -471,7 +484,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func modelInfoIsPersisted() throws {
         var s = Session(name: "x", directory: "/x")
         s.modelInfo = ModelInfo(model: "claude-opus-5-5", effort: "high")
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-mi-\(UUID()).json")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-mi-\(UUID()).json")
         try PersistedState(sessions: [s]).save(to: url)
         #expect(PersistedState.load(from: url)?.sessions.first?.modelInfo == s.modelInfo)
     }
@@ -481,7 +494,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func sessionStartShowsModelBeforeFirstAnswer() {
         let id = UUID()
         // Real SessionStart payload shape (captured from Claude Code).
-        let json = #"{"flamingo":"\#(id.uuidString)","payload":{"session_id":"72700620","transcript_path":"/nope.jsonl","cwd":"/x","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5-5"}}"#
+        let json = #"{"bubblegum":"\#(id.uuidString)","payload":{"session_id":"72700620","transcript_path":"/nope.jsonl","cwd":"/x","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5-5"}}"#
         let e = HookEvent.parse(Data(json.utf8))!
         #expect(e.payloadModel == "claude-opus-5-5")
         var s = Session(id: id, name: "x", directory: "/x", status: .starting)
@@ -505,7 +518,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     }
 
     @Test func transcriptExistence() throws {
-        let projects = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-projects-\(UUID())")
+        let projects = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-projects-\(UUID())")
         let dir = projects.appendingPathComponent("-Users-me-code-api")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data().write(to: dir.appendingPathComponent("abc.jsonl"))
@@ -589,7 +602,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func fileNamesAndLookup() throws {
         #expect(TranscriptExporter.suggestedFileName(for: "API: v2/beta") == "API- v2-beta.md")
         #expect(TranscriptExporter.suggestedFileName(for: "  ") == "Session.md")
-        let projects = FileManager.default.temporaryDirectory.appendingPathComponent("flamingo-proj-\(UUID())")
+        let projects = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-proj-\(UUID())")
         let dir = projects.appendingPathComponent("-x")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data().write(to: dir.appendingPathComponent("s1.jsonl"))
@@ -603,7 +616,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let data = try Data(contentsOf: root.appendingPathComponent("Resources/Info.plist"))
         let plist = try #require(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
-        #expect(AppVersion.version == "0.1.0")
+        #expect(AppVersion.version == "0.2.0")
         #expect(plist["CFBundleShortVersionString"] as? String == AppVersion.version)
         #expect(plist["CFBundleVersion"] as? String == AppVersion.build)
         #expect(plist["NSHumanReadableCopyright"] as? String == AppVersion.copyright)

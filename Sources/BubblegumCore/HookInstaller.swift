@@ -5,32 +5,35 @@ public struct AppPaths: Sendable {
     public var supportDirectory: URL
     public var claudeDirectory: URL
 
-    /// Where the app kept its data before it was renamed from "Terminal Flamingo" (nil for dev paths).
-    public var legacySupportDirectory: URL?
+    /// Where the app kept its data under its previous names, newest first: "Flamingo", then
+    /// "Terminal Flamingo" (empty for dev paths).
+    public var legacySupportDirectories: [URL]
 
-    public init(supportDirectory: URL, claudeDirectory: URL, legacySupportDirectory: URL? = nil) {
+    public init(supportDirectory: URL, claudeDirectory: URL, legacySupportDirectories: [URL] = []) {
         self.supportDirectory = supportDirectory
         self.claudeDirectory = claudeDirectory
-        self.legacySupportDirectory = legacySupportDirectory
+        self.legacySupportDirectories = legacySupportDirectories
     }
 
-    /// The real locations. For development, `FLAMINGO_SUPPORT_DIR` overrides the app's own folder;
-    /// Claude's folder then defaults to `<FLAMINGO_SUPPORT_DIR>/claude` (or `FLAMINGO_CLAUDE_DIR`) so a
+    /// The real locations. For development, `BUBBLEGUM_SUPPORT_DIR` overrides the app's own folder;
+    /// Claude's folder then defaults to `<BUBBLEGUM_SUPPORT_DIR>/claude` (or `BUBBLEGUM_CLAUDE_DIR`) so a
     /// dev run can never write hooks into the real ~/.claude.
     public static var standard: AppPaths {
         standard(environment: ProcessInfo.processInfo.environment)
     }
 
     public static func standard(environment env: [String: String], home: URL = FileManager.default.homeDirectoryForCurrentUser) -> AppPaths {
-        let support = env["FLAMINGO_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-        let claude = env["FLAMINGO_CLAUDE_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let support = env["BUBBLEGUM_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let claude = env["BUBBLEGUM_CLAUDE_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? support?.appendingPathComponent("claude", isDirectory: true)
         return AppPaths(
-            supportDirectory: support ?? home.appendingPathComponent("Library/Application Support/Flamingo", isDirectory: true),
+            supportDirectory: support ?? home.appendingPathComponent("Library/Application Support/Bubblegum", isDirectory: true),
             claudeDirectory: claude ?? home.appendingPathComponent(".claude", isDirectory: true),
-            legacySupportDirectory: support == nil
-                ? home.appendingPathComponent("Library/Application Support/TerminalFlamingo", isDirectory: true)
-                : nil
+            legacySupportDirectories: support == nil
+                ? ["Flamingo", "TerminalFlamingo"].map {
+                    home.appendingPathComponent("Library/Application Support/\($0)", isDirectory: true)
+                }
+                : []
         )
     }
 
@@ -39,7 +42,7 @@ public struct AppPaths: Sendable {
     public var hookScript: URL { supportDirectory.appendingPathComponent("hook.sh") }
     public var eventsDirectory: URL { supportDirectory.appendingPathComponent("events", isDirectory: true) }
     public var claudeSettings: URL { claudeDirectory.appendingPathComponent("settings.json") }
-    public var claudeSettingsBackup: URL { claudeDirectory.appendingPathComponent("settings.json.flamingo-backup") }
+    public var claudeSettingsBackup: URL { claudeDirectory.appendingPathComponent("settings.json.bubblegum-backup") }
 }
 
 public enum HookInstallError: LocalizedError, Equatable {
@@ -63,17 +66,20 @@ public enum HookInstallError: LocalizedError, Equatable {
 public struct HookInstaller: Sendable {
     public static let events = ["SessionStart", "UserPromptSubmit", "Notification", "Stop"]
     /// Substring identifying our entries in settings.json.
-    public static let marker = "Flamingo/hook.sh"
+    public static let marker = "Bubblegum/hook.sh"
+    /// Markers of entries written under previous names ("Flamingo/hook.sh" also matches
+    /// "TerminalFlamingo/hook.sh"); they are ours too and get replaced on install.
+    public static let legacyMarkers = ["Flamingo/hook.sh"]
 
     public static let script = """
     #!/bin/sh
-    [ -n "$FLAMINGO_SESSION_ID" ] || exit 0
-    DIR="$HOME/Library/Application Support/Flamingo/events"
+    [ -n "$BUBBLEGUM_SESSION_ID" ] || exit 0
+    DIR="$HOME/Library/Application Support/Bubblegum/events"
     mkdir -p "$DIR" || exit 0
     PAYLOAD=$(cat)
     [ -n "$PAYLOAD" ] || PAYLOAD=null
     TMP="$DIR/.$$.tmp"
-    printf '{"flamingo":"%s","payload":%s}\\n' "$FLAMINGO_SESSION_ID" "$PAYLOAD" > "$TMP" && mv "$TMP" "$DIR/$(date +%s)-$$.json"
+    printf '{"bubblegum":"%s","payload":%s}\\n' "$BUBBLEGUM_SESSION_ID" "$PAYLOAD" > "$TMP" && mv "$TMP" "$DIR/$(date +%s)-$$.json"
     exit 0
 
     """
@@ -99,7 +105,7 @@ public struct HookInstaller: Sendable {
     }
 
     /// True when settings.json still has entries for a hook script that is not this install's
-    /// (e.g. the pre-rename `…/TerminalFlamingo/hook.sh`), so they need rewriting.
+    /// (e.g. the pre-rename `…/Flamingo/hook.sh`), so they need rewriting.
     public func hasStaleEntries() -> Bool {
         guard let data = try? Data(contentsOf: paths.claudeSettings),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -126,11 +132,11 @@ public struct HookInstaller: Sendable {
         }
     }
 
-    /// Our entry: the command contains the marker (this also matches the pre-rename
-    /// `TerminalFlamingo/hook.sh`), or is exactly this install's command.
+    /// Our entry: the command contains the marker or a legacy one (the pre-rename
+    /// `Flamingo/hook.sh` or `TerminalFlamingo/hook.sh`), or is exactly this install's command.
     static func isOurs(_ hook: [String: Any], command: String? = nil) -> Bool {
         guard let c = hook["command"] as? String else { return false }
-        return c.contains(marker) || (command != nil && c == command)
+        return ([marker] + legacyMarkers).contains { c.contains($0) } || (command != nil && c == command)
     }
 
     // MARK: Install
