@@ -184,3 +184,58 @@ import Testing
         #expect(items == [.label("Results · 2"), .row(a.id), .row(b.id)])
     }
 }
+
+@Suite struct DropRuleTests {
+    let work = SessionGroup(name: "Work", color: .blue, order: 0)
+    let side = SessionGroup(name: "Side", color: .pink, order: 1)
+    var groups: [SessionGroup] { [work, side] }
+    var a: Session { Session(id: ids[0], name: "a", directory: "/a", groupId: work.id, order: 0) }
+    var b: Session { Session(id: ids[1], name: "b", directory: "/b", groupId: work.id, order: 1) }
+    var c: Session { Session(id: ids[2], name: "c", directory: "/c") }
+    var z: Session { Session(id: ids[3], name: "z", directory: "/z", isArchived: true) }
+    let ids = (0..<4).map { _ in UUID() }
+    var sessions: [Session] { [a, b, c, z] }
+
+    func drop(_ d: SidebarDragItem, _ t: SidebarItem, upper: Bool = true) -> SidebarDrop? {
+        SidebarDropRules.resolve(d, onto: t, upperHalf: upper, sessions: sessions, groups: groups)
+    }
+
+    @Test func sessionOntoRowsInsertsBeforeOrAfter() {
+        #expect(drop(.session(c.id), .row(b.id))?.action == .moveSession(c.id, toGroup: work.id, before: b.id))
+        #expect(drop(.session(c.id), .row(b.id))?.mark == .lineAbove(b.id.uuidString))
+        #expect(drop(.session(c.id), .row(a.id), upper: false)?.action == .moveSession(c.id, toGroup: work.id, before: b.id))
+        // Below the last row: at the end of the group.
+        #expect(drop(.session(c.id), .row(b.id), upper: false)?.action == .moveSession(c.id, toGroup: work.id, before: nil))
+        // Reorder inside a group, and onto an ungrouped row.
+        #expect(drop(.session(b.id), .row(a.id))?.action == .moveSession(b.id, toGroup: work.id, before: a.id))
+        #expect(drop(.session(a.id), .row(c.id))?.action == .moveSession(a.id, toGroup: nil, before: c.id))
+        #expect(drop(.session(a.id), .row(a.id)) == nil)
+    }
+
+    @Test func sessionOntoHeadings() {
+        #expect(drop(.session(c.id), .group(id: side.id, count: 0, isOpen: true, needsAttention: false))
+                == SidebarDrop(action: .moveSession(c.id, toGroup: side.id, before: nil), mark: .highlight("group:" + side.id.uuidString)))
+        #expect(drop(.session(a.id), .ungrouped(count: 1))?.action == .moveSession(a.id, toGroup: nil, before: nil))
+        #expect(drop(.session(a.id), .archivedToggle(count: 1, isOpen: true))
+                == SidebarDrop(action: .archive(a.id), mark: .highlight("archived-toggle")))
+        #expect(drop(.session(a.id), .row(z.id))?.action == .archive(a.id))
+        // Already archived: nothing to do.
+        #expect(drop(.session(z.id), .archivedToggle(count: 1, isOpen: true)) == nil)
+        // An archived session dropped onto a group moves (and is unarchived by the store).
+        #expect(drop(.session(z.id), .group(id: work.id, count: 2, isOpen: true, needsAttention: false))?.action
+                == .moveSession(z.id, toGroup: work.id, before: nil))
+        #expect(drop(.session(a.id), .newGroup) == nil)
+    }
+
+    @Test func groupsReorderButStayAboveUngrouped() {
+        let workHead = SidebarItem.group(id: work.id, count: 2, isOpen: true, needsAttention: false)
+        let sideHead = SidebarItem.group(id: side.id, count: 0, isOpen: true, needsAttention: false)
+        #expect(drop(.group(side.id), workHead)?.action == .moveGroup(side.id, before: work.id))
+        #expect(drop(.group(work.id), sideHead, upper: false)?.action == .moveGroup(work.id, before: nil))
+        #expect(drop(.group(work.id), sideHead, upper: false)?.mark == .lineBelow(sideHead.id))
+        #expect(drop(.group(work.id), .ungrouped(count: 1)) == SidebarDrop(action: .moveGroup(work.id, before: nil), mark: .lineAbove("ungrouped")))
+        #expect(drop(.group(work.id), workHead) == nil)
+        #expect(drop(.group(work.id), .archivedToggle(count: 1, isOpen: true)) == nil)
+        #expect(drop(.group(work.id), .row(c.id)) == nil)
+    }
+}

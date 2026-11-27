@@ -101,3 +101,84 @@ public enum QuickSwitcherFilter {
         return byName + byOther
     }
 }
+
+// MARK: - Drag and drop
+
+/// What is being dragged in the sidebar.
+public enum SidebarDragItem: Equatable, Sendable {
+    case session(UUID)
+    case group(UUID)
+}
+
+public enum SidebarDropAction: Equatable {
+    /// Into a group (nil = Ungrouped), before a row (nil = at the end).
+    case moveSession(UUID, toGroup: UUID?, before: UUID?)
+    case archive(UUID)
+    /// Before another group (nil = last, above Ungrouped).
+    case moveGroup(UUID, before: UUID?)
+}
+
+/// Where the sidebar shows the drop: a line above or below an item, or a highlighted heading.
+/// Values are `SidebarItem.id`s.
+public enum SidebarDropMark: Equatable {
+    case lineAbove(String)
+    case lineBelow(String)
+    case highlight(String)
+}
+
+public struct SidebarDrop: Equatable {
+    public var action: SidebarDropAction
+    public var mark: SidebarDropMark
+}
+
+public enum SidebarDropRules {
+    /// What dropping `drag` on `target` does. `upperHalf`: the pointer is in the top half of the
+    /// target, so rows and group headings insert before it, otherwise after. nil = not a valid drop.
+    /// Ungrouped and Archived are fixed: groups can't go below Ungrouped.
+    public static func resolve(_ drag: SidebarDragItem, onto target: SidebarItem, upperHalf: Bool,
+                               sessions: [Session], groups: [SessionGroup]) -> SidebarDrop? {
+        switch (drag, target) {
+        case (.session(let id), .row(let rowId)):
+            guard let row = sessions.first(where: { $0.id == rowId }) else { return nil }
+            if row.isArchived {
+                return archive(id, sessions: sessions)
+            }
+            guard rowId != id else { return nil }
+            if upperHalf {
+                return SidebarDrop(action: .moveSession(id, toGroup: row.groupId, before: rowId), mark: .lineAbove(target.id))
+            }
+            let members = GroupOps.members(of: row.groupId, in: sessions).map(\.id)
+            let next = members.firstIndex(of: rowId).flatMap { $0 + 1 < members.count ? members[$0 + 1] : nil }
+            return SidebarDrop(action: .moveSession(id, toGroup: row.groupId, before: next), mark: .lineBelow(target.id))
+
+        case (.session(let id), .group(let gid, _, _, _)):
+            return SidebarDrop(action: .moveSession(id, toGroup: gid, before: nil), mark: .highlight(target.id))
+
+        case (.session(let id), .ungrouped):
+            return SidebarDrop(action: .moveSession(id, toGroup: nil, before: nil), mark: .highlight(target.id))
+
+        case (.session(let id), .archivedToggle):
+            return archive(id, sessions: sessions)
+
+        case (.group(let id), .group(let gid, _, _, _)):
+            guard gid != id else { return nil }
+            if upperHalf {
+                return SidebarDrop(action: .moveGroup(id, before: gid), mark: .lineAbove(target.id))
+            }
+            let order = GroupOps.sorted(groups).map(\.id)
+            let next = order.firstIndex(of: gid).flatMap { $0 + 1 < order.count ? order[$0 + 1] : nil }
+            return SidebarDrop(action: .moveGroup(id, before: next), mark: .lineBelow(target.id))
+
+        case (.group(let id), .ungrouped), (.group(let id), .newGroup):
+            return SidebarDrop(action: .moveGroup(id, before: nil), mark: .lineAbove(SidebarItem.ungrouped(count: 0).id))
+
+        default:
+            return nil
+        }
+    }
+
+    private static func archive(_ id: UUID, sessions: [Session]) -> SidebarDrop? {
+        guard sessions.first(where: { $0.id == id })?.isArchived == false else { return nil }
+        return SidebarDrop(action: .archive(id), mark: .highlight(SidebarItem.archivedToggle(count: 0, isOpen: true).id))
+    }
+}
