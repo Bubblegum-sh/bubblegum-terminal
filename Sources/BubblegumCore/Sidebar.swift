@@ -160,14 +160,16 @@ public enum SidebarDropRules {
         case (.session(let id), .archivedToggle):
             return archive(id, sessions: sessions)
 
-        case (.group(let id), .group(let gid, _, _, _)):
+        case (.group(let id), .group(let gid, _, let isOpen, _)):
             guard gid != id else { return nil }
             if upperHalf {
                 return SidebarDrop(action: .moveGroup(id, before: gid), mark: .lineAbove(target.id))
             }
             let order = GroupOps.sorted(groups).map(\.id)
             let next = order.firstIndex(of: gid).flatMap { $0 + 1 < order.count ? order[$0 + 1] : nil }
-            return SidebarDrop(action: .moveGroup(id, before: next), mark: .lineBelow(target.id))
+            // The group lands after this one's rows, so draw the line under its last visible row.
+            let lastRow = isOpen ? GroupOps.members(of: gid, in: sessions).last.map { SidebarItem.row($0.id).id } : nil
+            return SidebarDrop(action: .moveGroup(id, before: next), mark: .lineBelow(lastRow ?? target.id))
 
         case (.group(let id), .ungrouped), (.group(let id), .newGroup):
             return SidebarDrop(action: .moveGroup(id, before: nil), mark: .lineAbove(SidebarItem.ungrouped(count: 0).id))

@@ -232,7 +232,11 @@ import Testing
         let sideHead = SidebarItem.group(id: side.id, count: 0, isOpen: true, needsAttention: false)
         #expect(drop(.group(side.id), workHead)?.action == .moveGroup(side.id, before: work.id))
         #expect(drop(.group(work.id), sideHead, upper: false)?.action == .moveGroup(work.id, before: nil))
-        #expect(drop(.group(work.id), sideHead, upper: false)?.mark == .lineBelow(sideHead.id))
+        #expect(drop(.group(work.id), sideHead, upper: false)?.mark == .lineBelow(sideHead.id)) // empty group
+        // Below an expanded group with rows: the line goes under its last row, where the group lands.
+        #expect(drop(.group(side.id), workHead, upper: false)?.mark == .lineBelow(b.id.uuidString))
+        let workClosed = SidebarItem.group(id: work.id, count: 2, isOpen: false, needsAttention: false)
+        #expect(drop(.group(side.id), workClosed, upper: false)?.mark == .lineBelow(workClosed.id))
         #expect(drop(.group(work.id), .ungrouped(count: 1)) == SidebarDrop(action: .moveGroup(work.id, before: nil), mark: .lineAbove("ungrouped")))
         #expect(drop(.group(work.id), workHead) == nil)
         #expect(drop(.group(work.id), .archivedToggle(count: 1, isOpen: true)) == nil)
