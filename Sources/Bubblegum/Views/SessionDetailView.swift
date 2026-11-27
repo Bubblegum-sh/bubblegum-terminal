@@ -90,7 +90,6 @@ struct SessionDetailView: View {
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
                 BranchPill(git: store.git, isOpen: $branchOpen)
-                StatusPill(session: s)
                 if let info = s.modelInfo {
                     ModelPill(info: info)
                 }
@@ -120,27 +119,6 @@ struct SessionDetailView: View {
                 .keyboardShortcut(.defaultAction)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct StatusPill: View {
-    let session: Session
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        let label = session.isArchived ? "Archived" : session.status.label
-        HStack(spacing: 6) {
-            Circle().fill(theme.statusC(session.status)).frame(width: 7, height: 7)
-            Text(label).font(.system(size: 11, weight: .medium)).lineLimit(1)
-        }
-        .fixedSize()
-        .padding(.vertical, 4)
-        .padding(.leading, 8)
-        .padding(.trailing, 10)
-        .background(Capsule().fill(theme.elevatedC))
-        .help(session.status.label)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Status: \(label)")
     }
 }
 
