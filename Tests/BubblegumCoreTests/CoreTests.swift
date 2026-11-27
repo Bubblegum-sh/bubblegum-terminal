@@ -624,3 +624,87 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(license.hasPrefix("MIT License"))
     }
 }
+
+@Suite struct GitTests {
+    @Test func parsesStatus() {
+        let s = Git.parseStatus("""
+        # branch.oid 1234567890abcdef
+        # branch.head feat/session-hooks
+        # branch.upstream origin/feat/session-hooks
+        # branch.ab +2 -1
+        1 .M N... 100644 100644 100644 abc abc Sources/a.swift
+        2 R. N... 100644 100644 100644 abc abc R100 new.swift\told.swift
+        ? notes.txt
+        """)
+        #expect(s == GitStatus(branch: "feat/session-hooks", head: "1234567", changes: 3, ahead: 2, behind: 1))
+        #expect(s.displayName == "feat/session-hooks")
+    }
+
+    @Test func parsesDetachedAndInitial() {
+        let d = Git.parseStatus("# branch.oid abcdef0123\n# branch.head (detached)\n")
+        #expect(d.branch == nil && d.displayName == "abcdef0")
+        let i = Git.parseStatus("# branch.oid (initial)\n# branch.head main\n")
+        #expect(i.branch == "main" && i.head == "" && i.changes == 0)
+    }
+
+    @Test func parsesBranches() {
+        let b = Git.parseBranches("""
+        refs/heads/main\t1700000000\t\tMerge pull request #12
+        refs/heads/feat/x\t1700000100\tahead 2, behind 1\tAdd x\twith tab
+        refs/remotes/origin/HEAD\t1700000000\t\t
+        refs/remotes/origin/release/0.1\t1690000000\t\tBump version
+        refs/remotes/origin\t1690000000\t\t
+        """)
+        #expect(b.map(\.name) == ["main", "feat/x", "origin/release/0.1"])
+        #expect(b[1].ahead == 2 && b[1].behind == 1 && b[1].subject == "Add x\twith tab")
+        #expect(b[2].isRemote && b[2].localName == "release/0.1")
+    }
+
+    @Test func parsesReflog() {
+        let names = Git.parseReflog("""
+        checkout: moving from main to feat/x
+        commit: something
+        checkout: moving from fix/y to main
+        checkout: moving from feat/x to fix/y
+        """)
+        #expect(names == ["feat/x", "main", "fix/y"])
+    }
+
+    @Test func groupsSections() {
+        let b = ["a", "b", "c", "d", "e"].map { GitBranch(name: $0, isRemote: false) } + [GitBranch(name: "origin/a", isRemote: true)]
+        let s = Git.sections(b, current: "a", recentNames: ["a", "d", "zzz"])
+        #expect(s.current?.name == "a")
+        #expect(s.recent.map(\.name) == ["d", "b", "c"])
+        #expect(s.otherLocal.map(\.name) == ["e"])
+        #expect(s.remote.map(\.name) == ["origin/a"])
+        #expect(Git.filter(b, query: "A").map(\.name) == ["a", "origin/a"])
+    }
+}
+
+@Suite struct GitIntegrationTests {
+    @Test func statusBranchesSwitchCreate() throws {
+        guard Git.executable != nil else { return }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-git-\(UUID().uuidString)").path
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        #expect(Git.status(in: dir) == nil) // not a repo
+
+        func git(_ args: String...) { _ = Git.run(args, in: dir) }
+        git("init", "-q", "-b", "main")
+        git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "first")
+        #expect(Git.status(in: dir)?.branch == "main")
+
+        try Git.createBranch("feat/x", in: dir)
+        #expect(Git.status(in: dir)?.branch == "feat/x")
+        #expect(throws: GitError.self) { try Git.createBranch("bad name..", in: dir) }
+
+        try "hi".write(toFile: dir + "/a.txt", atomically: true, encoding: .utf8)
+        #expect(Git.status(in: dir)?.changes == 1)
+
+        let main = try #require(Git.branches(in: dir).first { $0.name == "main" })
+        #expect(main.subject == "first")
+        try Git.switchTo(main, localNames: ["main", "feat/x"], in: dir)
+        #expect(Git.status(in: dir)?.branch == "main")
+        #expect(Git.recentlyCheckedOut(in: dir).prefix(2) == ["main", "feat/x"])
+    }
+}

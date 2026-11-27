@@ -10,7 +10,9 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [Session] = [] {
         didSet { updateBadge() }
     }
-    @Published private(set) var selectedId: UUID?
+    @Published private(set) var selectedId: UUID? {
+        didSet { if selectedId != oldValue { git.track(selected?.directory) } }
+    }
     @Published var query: String = ""
     @Published var archivedOpen: Bool = true { didSet { if archivedOpen != oldValue { persist() } } }
 
@@ -35,6 +37,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var terminalFocusRequest = 0
 
     let terminals = TerminalRegistry()
+    let git = GitMonitor()
     let notifier = Notifier()
     let paths: AppPaths
     private let installer: HookInstaller
@@ -69,6 +72,8 @@ final class SessionStore: ObservableObject {
             self?.handle(events)
         }
         watcher?.start()
+        git.start()
+        git.track(selected?.directory)
 
         refreshHookState()
         let key = "didOfferHookInstall"
@@ -368,6 +373,7 @@ final class SessionStore: ObservableObject {
 
     func appDidBecomeActive() {
         if let id = selectedId { markRead(id) }
+        git.refresh()
     }
 
     private func markRead(_ id: UUID) {
@@ -406,6 +412,7 @@ final class SessionStore: ObservableObject {
             sessions[i] = s
             changed = true
             if let alert { notifier.post(alert) }
+            if s.id == selectedId { git.refresh() } // Claude may have committed or switched branches
         }
         if changed { persist() }
     }

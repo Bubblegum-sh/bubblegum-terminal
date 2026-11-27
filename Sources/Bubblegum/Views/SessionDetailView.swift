@@ -5,6 +5,7 @@ import BubblegumCore
 struct SessionDetailView: View {
     @EnvironmentObject private var store: SessionStore
     @Environment(\.theme) private var theme
+    @State private var branchOpen = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,6 +36,33 @@ struct SessionDetailView: View {
                 }
             }
         }
+        .overlayPreferenceValue(BranchPillAnchorKey.self) { branchSwitcher($0) }
+        .onChange(of: store.selectedId) { _, _ in branchOpen = false }
+    }
+
+    /// The branch switcher, opened under the branch pill; a click anywhere else closes it.
+    @ViewBuilder
+    private func branchSwitcher(_ anchor: Anchor<CGRect>?) -> some View {
+        if branchOpen, let anchor {
+            GeometryReader { proxy in
+                let pill = proxy[anchor]
+                let width: CGFloat = 370
+                let x = min(max(pill.midX - width / 2, 8), proxy.size.width - width - 8)
+                ZStack(alignment: .topLeading) {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture { closeBranchSwitcher() }
+                        .accessibilityHidden(true)
+                    BranchSwitcherPanel(git: store.git, close: closeBranchSwitcher)
+                        .offset(x: x, y: pill.maxY + 6)
+                }
+            }
+        }
+    }
+
+    private func closeBranchSwitcher() {
+        branchOpen = false
+        store.focusTerminal()
     }
 
     // MARK: Toolbar (N-2)
@@ -55,6 +83,7 @@ struct SessionDetailView: View {
                 }
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
+                BranchPill(git: store.git, isOpen: $branchOpen)
                 StatusPill(session: s)
                 if let info = s.modelInfo {
                     ModelPill(info: info)
