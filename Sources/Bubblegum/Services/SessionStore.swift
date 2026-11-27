@@ -333,16 +333,18 @@ final class SessionStore: ObservableObject {
             return
         }
         guard let id = id ?? selectedId, let s = session(id) else { return }
-        reveal(id)
+        // A search that hides the row is cleared first, then its group / Archived is opened.
         if !query.isEmpty && !SidebarLayout.matches(s, query: query) { query = "" }
+        reveal(id)
         if selectedId != id { select(id, focusTerminal: false) }
         renamingId = id
     }
 
     /// Expands what hides a session's row (its collapsed group, the closed Archived section),
-    /// e.g. when the quick switcher or a notification selects it.
+    /// e.g. when the quick switcher or a notification selects it. Also while a search is shown,
+    /// so the row is still visible once the search is cleared.
     private func reveal(_ id: UUID) {
-        guard query.isEmpty, let s = session(id) else { return }
+        guard let s = session(id) else { return }
         if s.isArchived {
             if !archivedOpen { archivedOpen = true }
         } else if let g = group(s.groupId), g.isCollapsed {
