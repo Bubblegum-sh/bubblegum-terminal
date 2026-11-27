@@ -1,7 +1,7 @@
 import SwiftUI
 import BubblegumCore
 
-/// One sidebar row (L-2, L-3): status dot, name, subtitle, and time/unread or inline actions.
+/// One sidebar row (L-2, L-3): status dot, name, subtitle, and time/unread.
 struct SessionRow: View {
     let session: Session
     let isSelected: Bool
@@ -31,9 +31,7 @@ struct SessionRow: View {
                     .accessibilityAction { store.select(session.id) }
             }
 
-            if isSelected && !isRenaming {
-                actions
-            } else if !isRenaming {
+            if !isRenaming {
                 meta
             }
         }
@@ -86,21 +84,6 @@ struct SessionRow: View {
         }
         .padding(.trailing, 10)
         .allowsHitTesting(false)
-    }
-
-    private var actions: some View {
-        HStack(spacing: 2) {
-            if session.isArchived {
-                IconButton(systemImage: "tray.and.arrow.up", label: "Unarchive (⇧⌘A)") {
-                    store.toggleArchive(session.id)
-                }
-            } else {
-                IconButton(systemImage: "archivebox", label: "Archive (⇧⌘A)") {
-                    store.toggleArchive(session.id)
-                }
-            }
-        }
-        .padding(.trailing, 6)
     }
 
     // MARK: Rename (L-5)
