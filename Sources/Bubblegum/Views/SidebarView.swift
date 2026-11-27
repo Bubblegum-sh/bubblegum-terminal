@@ -31,6 +31,7 @@ struct SidebarView: View {
                         LazyVStack(alignment: .leading, spacing: 2) {
                             ForEach(store.sidebarItems) { item in
                                 itemView(item, now: context.date)
+                                    .modifier(SidebarDragDrop(item: item, drag: dragItem(item)))
                             }
                         }
                     }
@@ -169,6 +170,15 @@ struct SidebarView: View {
                     groupTag: (s.isArchived || !store.query.isEmpty) ? store.group(s.groupId) : nil
                 )
             }
+        }
+    }
+
+    /// Session rows and group headings can be dragged (not while renaming them).
+    private func dragItem(_ item: SidebarItem) -> SidebarDragItem? {
+        switch item {
+        case .row(let id): return store.renamingId == id ? nil : .session(id)
+        case .group(let id, _, _, _): return store.renamingGroupId == id ? nil : .group(id)
+        default: return nil
         }
     }
 

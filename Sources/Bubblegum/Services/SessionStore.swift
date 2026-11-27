@@ -38,6 +38,9 @@ final class SessionStore: ObservableObject {
     @Published var confirmDeleteGroupId: UUID?
     /// The Create group sheet, when open.
     @Published var groupSheet: GroupSheetRequest?
+    /// Sidebar drag in progress, and where its drop would land.
+    @Published var sidebarDrag: SidebarDragItem?
+    @Published var dropMark: SidebarDropMark?
     /// Set while the New session sheet was opened from a group's "Add new session".
     @Published private(set) var newSessionGroupId: UUID?
     /// Incremented to ask the sidebar to focus the search field (⌘F).
@@ -470,6 +473,14 @@ final class SessionStore: ObservableObject {
     func moveGroup(_ id: UUID, before: UUID?) {
         GroupOps.moveGroup(id, before: before, groups: &groups)
         persist()
+    }
+
+    func perform(_ action: SidebarDropAction) {
+        switch action {
+        case .moveSession(let id, let groupId, let before): moveSession(id, toGroup: groupId, before: before)
+        case .archive(let id): archive(id)
+        case .moveGroup(let id, let before): moveGroup(id, before: before)
+        }
     }
 
     // MARK: Export
