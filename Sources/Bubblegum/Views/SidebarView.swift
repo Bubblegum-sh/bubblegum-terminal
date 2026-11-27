@@ -43,6 +43,7 @@ struct SidebarView: View {
                 .onAppear { reveal(store.selectedId, proxy, animated: false) }
                 .onChange(of: store.selectedId) { _, id in reveal(id, proxy, animated: true) }
                 .onChange(of: store.archivedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
+                .onChange(of: store.ungroupedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
             }
 
             footer
@@ -136,8 +137,8 @@ struct SidebarView: View {
                 GroupHeader(group: g, count: count, isOpen: isOpen, needsAttention: attention,
                             isRenaming: store.renamingGroupId == id)
             }
-        case .ungrouped(let count):
-            UngroupedHeader(count: count)
+        case .ungrouped(let count, let isOpen, let attention):
+            UngroupedHeader(count: count, isOpen: isOpen, needsAttention: attention)
         case .newGroup:
             NewGroupButton()
         case .archivedToggle(let count, let isOpen):

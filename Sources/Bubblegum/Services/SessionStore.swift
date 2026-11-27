@@ -16,6 +16,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var groups: [SessionGroup] = []
     @Published var query: String = ""
     @Published var archivedOpen: Bool = true { didSet { if archivedOpen != oldValue { persist() } } }
+    @Published var ungroupedOpen: Bool = true { didSet { if ungroupedOpen != oldValue { persist() } } }
 
     // UI state
     @Published var renamingId: UUID?
@@ -68,6 +69,7 @@ final class SessionStore: ObservableObject {
             groups = state.groups
             selectedId = state.selectedId.flatMap { id in sessions.contains { $0.id == id } ? id : nil }
             archivedOpen = state.archivedOpen
+            ungroupedOpen = state.ungroupedOpen
         }
         if let backup = loaded.backup {
             let what = loaded.state == nil ? "Saved sessions couldn’t be read" : "Some saved sessions couldn’t be read"
@@ -120,7 +122,7 @@ final class SessionStore: ObservableObject {
     var selected: Session? { session(selectedId) }
 
     var sidebarItems: [SidebarItem] {
-        SidebarLayout.items(sessions: sessions, groups: groups, query: query, archivedOpen: archivedOpen)
+        SidebarLayout.items(sessions: sessions, groups: groups, query: query, archivedOpen: archivedOpen, ungroupedOpen: ungroupedOpen)
     }
 
     var visibleIds: [UUID] { SidebarLayout.visibleIds(sidebarItems) }
@@ -352,8 +354,10 @@ final class SessionStore: ObservableObject {
         guard let s = session(id) else { return }
         if s.isArchived {
             if !archivedOpen { archivedOpen = true }
-        } else if let g = group(s.groupId), g.isCollapsed {
-            setCollapsed(g.id, false)
+        } else if let g = group(s.groupId) {
+            if g.isCollapsed { setCollapsed(g.id, false) }
+        } else if !ungroupedOpen {
+            ungroupedOpen = true
         }
     }
 
@@ -659,7 +663,8 @@ final class SessionStore: ObservableObject {
     }
 
     private func persist() {
-        let state = PersistedState(sessions: sessions, groups: groups, selectedId: selectedId, archivedOpen: archivedOpen)
+        let state = PersistedState(sessions: sessions, groups: groups, selectedId: selectedId, archivedOpen: archivedOpen,
+                                   ungroupedOpen: ungroupedOpen)
         do { try state.save(to: paths.sessionsFile) } catch {
             NSLog("Bubblegum: could not save sessions: \(error)")
         }

@@ -175,18 +175,20 @@ func swatchImage(_ color: NSColor, size: CGFloat = 12) -> NSImage {
     return image
 }
 
-/// Fixed "Ungrouped · N" heading. No menu; hovering shows a + that opens New session.
+/// Fixed "Ungrouped · N" heading. No menu; clicking toggles collapse like a group heading,
+/// hovering shows a + that opens New session.
 struct UngroupedHeader: View {
     let count: Int
+    let isOpen: Bool
+    let needsAttention: Bool
     @EnvironmentObject private var store: SessionStore
     @Environment(\.theme) private var theme
     @State private var hover = false
     @FocusState private var plusFocused: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            GroupLabel(text: "Ungrouped · \(count)")
-            Spacer(minLength: 0)
+        HStack(spacing: 2) {
+            toggle
             Button {
                 store.showNewSessionSheet()
             } label: {
@@ -203,13 +205,42 @@ struct UngroupedHeader: View {
             .help("New ungrouped session")
             .accessibilityLabel("New ungrouped session")
         }
-        .frame(minHeight: 28)
-        .padding(.top, 6)
-        .padding(.leading, 8)
         .padding(.trailing, 4)
         .background(RoundedRectangle(cornerRadius: 6).fill(hover ? theme.text3.opacity(0.08) : .clear))
-        .contentShape(Rectangle())
         .onHover { hover = $0 }
+        .padding(.top, 6)
+    }
+
+    private var toggle: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(theme.text3)
+                .rotationEffect(.degrees(isOpen ? 90 : 0))
+            Text("UNGROUPED")
+                .foregroundStyle(theme.text3)
+            Text("· \(count)")
+                .foregroundStyle(theme.text3)
+                .fixedSize()
+            Spacer(minLength: 0)
+            if needsAttention {
+                Circle().fill(theme.accentC).frame(width: 8, height: 8)
+                    .padding(.trailing, 2)
+                    .help("An ungrouped session needs your attention")
+            }
+        }
+        .font(TFFont.groupLabel)
+        .tracking(0.6)
+        .padding(8)
+        .contentShape(Rectangle())
+        .onTapGesture { store.ungroupedOpen.toggle() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityAction { store.ungroupedOpen.toggle() }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Ungrouped, \(count) \(count == 1 ? "session" : "sessions")"
+                            + (needsAttention ? ", needs attention" : ""))
+        .accessibilityValue(isOpen ? "expanded" : "collapsed")
+        .accessibilityAddTraits(.isHeader)
     }
 }
 

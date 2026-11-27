@@ -7,8 +7,9 @@ public enum SidebarItem: Equatable, Identifiable {
     /// A user group's heading. `needsAttention` is only set while the group is collapsed:
     /// an expanded group shows no indicator (its rows show their own).
     case group(id: UUID, count: Int, isOpen: Bool, needsAttention: Bool)
-    /// Fixed "Ungrouped · N" heading below the user groups.
-    case ungrouped(count: Int)
+    /// Fixed "Ungrouped · N" heading below the user groups. Collapsible like a group;
+    /// `needsAttention` is only set while it is collapsed.
+    case ungrouped(count: Int, isOpen: Bool = true, needsAttention: Bool = false)
     /// "New group…" button at the end of the group list.
     case newGroup
     /// Fixed "Archived · N" heading at the bottom, shown even when empty.
@@ -31,7 +32,8 @@ public enum SidebarLayout {
     /// User groups (by order), then Ungrouped, the New group button, then Archived.
     /// Rows inside a group follow `Session.order`; archived rows keep creation order.
     /// With a query set, a flat list of results instead (F-1).
-    public static func items(sessions: [Session], groups: [SessionGroup] = [], query: String, archivedOpen: Bool) -> [SidebarItem] {
+    public static func items(sessions: [Session], groups: [SessionGroup] = [], query: String, archivedOpen: Bool,
+                             ungroupedOpen: Bool = true) -> [SidebarItem] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if !q.isEmpty {
             let hits = sessions.filter { matches($0, query: q) }
@@ -49,8 +51,9 @@ public enum SidebarLayout {
             if open { items += members.map { .row($0.id) } }
         }
         let loose = GroupOps.members(of: nil, in: sessions)
-        items.append(.ungrouped(count: loose.count))
-        items += loose.map { .row($0.id) }
+        let looseAttention = !ungroupedOpen && loose.contains { $0.unread || $0.status == .waiting }
+        items.append(.ungrouped(count: loose.count, isOpen: ungroupedOpen, needsAttention: looseAttention))
+        if ungroupedOpen { items += loose.map { .row($0.id) } }
         items.append(.newGroup)
 
         // Shown even when empty, like Ungrouped, so a session can always be dragged onto it.

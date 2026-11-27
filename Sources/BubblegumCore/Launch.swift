@@ -64,15 +64,18 @@ public struct PersistedState: Codable, Equatable {
     public var groups: [SessionGroup]
     public var selectedId: UUID?
     public var archivedOpen: Bool
+    public var ungroupedOpen: Bool
 
-    public init(sessions: [Session] = [], groups: [SessionGroup] = [], selectedId: UUID? = nil, archivedOpen: Bool = true) {
+    public init(sessions: [Session] = [], groups: [SessionGroup] = [], selectedId: UUID? = nil,
+                archivedOpen: Bool = true, ungroupedOpen: Bool = true) {
         self.sessions = sessions
         self.groups = groups
         self.selectedId = selectedId
         self.archivedOpen = archivedOpen
+        self.ungroupedOpen = ungroupedOpen
     }
 
-    enum CodingKeys: String, CodingKey { case sessions, groups, selectedId, archivedOpen }
+    enum CodingKeys: String, CodingKey { case sessions, groups, selectedId, archivedOpen, ungroupedOpen }
 
     /// Sessions that can't be decoded are skipped (counted in `skippedSessions`) rather than
     /// failing the whole file; the top level only needs a `sessions` array.
@@ -109,6 +112,7 @@ public struct PersistedState: Codable, Equatable {
         self.skippedSessions = skipped
         selectedId = try? c.decodeIfPresent(UUID.self, forKey: .selectedId)
         archivedOpen = (try? c.decodeIfPresent(Bool.self, forKey: .archivedOpen)) ?? true
+        ungroupedOpen = (try? c.decodeIfPresent(Bool.self, forKey: .ungroupedOpen)) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -117,6 +121,7 @@ public struct PersistedState: Codable, Equatable {
         try c.encode(groups, forKey: .groups)
         try c.encodeIfPresent(selectedId, forKey: .selectedId)
         try c.encode(archivedOpen, forKey: .archivedOpen)
+        try c.encode(ungroupedOpen, forKey: .ungroupedOpen)
     }
 
     /// Not persisted: how many sessions in the loaded file could not be read.
@@ -127,6 +132,7 @@ public struct PersistedState: Codable, Equatable {
 
     public static func == (a: PersistedState, b: PersistedState) -> Bool {
         a.sessions == b.sessions && a.groups == b.groups && a.selectedId == b.selectedId && a.archivedOpen == b.archivedOpen
+            && a.ungroupedOpen == b.ungroupedOpen
     }
 
     /// Parses sessions.json. nil when the file is missing or unreadable; never touches the file.

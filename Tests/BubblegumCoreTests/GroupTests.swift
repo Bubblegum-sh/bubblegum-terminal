@@ -176,6 +176,36 @@ import Testing
         #expect(SidebarLayout.visibleIds(items) == [quiet.id])
     }
 
+    @Test func collapsedUngroupedHidesRowsAndShowsAttention() {
+        let work = SessionGroup(name: "Work", color: .blue)
+        let inGroup = Session(name: "g", directory: "/g", groupId: work.id)
+        let quiet = Session(name: "quiet", directory: "/q")
+        let waiting = Session(name: "waiting", directory: "/w", status: .waiting)
+        func items(_ sessions: [Session], open: Bool) -> [SidebarItem] {
+            SidebarLayout.items(sessions: sessions, groups: [work], query: "", archivedOpen: true, ungroupedOpen: open)
+        }
+        let closed = items([inGroup, quiet], open: false)
+        #expect(closed.contains(.ungrouped(count: 1, isOpen: false, needsAttention: false)))
+        #expect(SidebarLayout.visibleIds(closed) == [inGroup.id])
+        #expect(items([quiet, waiting], open: false).contains(.ungrouped(count: 2, isOpen: false, needsAttention: true)))
+        // Expanded: rows show, no indicator on the heading.
+        let open = items([quiet, waiting], open: true)
+        #expect(open.contains(.ungrouped(count: 2, isOpen: true, needsAttention: false)))
+        #expect(SidebarLayout.visibleIds(open) == [quiet.id, waiting.id])
+        // Search ignores collapse.
+        let found = SidebarLayout.items(sessions: [quiet], groups: [], query: "qui", archivedOpen: true, ungroupedOpen: false)
+        #expect(found == [.label("Results · 1"), .row(quiet.id)])
+    }
+
+    @Test func ungroupedOpenPersists() throws {
+        let state = PersistedState(sessions: [], ungroupedOpen: false)
+        let decoded = try JSONDecoder().decode(PersistedState.self, from: JSONEncoder().encode(state))
+        #expect(decoded.ungroupedOpen == false)
+        // Older files without the key open it.
+        let old = try JSONDecoder().decode(PersistedState.self, from: Data(#"{"sessions": []}"#.utf8))
+        #expect(old.ungroupedOpen == true)
+    }
+
     @Test func searchIsFlatAcrossGroups() {
         let work = SessionGroup(name: "Work", color: .blue)
         let a = Session(name: "api", directory: "/a", groupId: work.id)

@@ -30,6 +30,7 @@ enum DebugSnapshot {
                 case "first": if let id = store.visibleIds.first { store.select(id, focusTerminal: false) }
                 case "last": if let id = store.visibleIds.last { store.select(id, focusTerminal: false) }
                 case "togglearchived": store.archivedOpen.toggle()
+                case "toggleungrouped": store.ungroupedOpen.toggle()
                 case "collapsegroup": if let g = store.sortedGroups.first { store.toggleCollapsed(g.id) }
                 case "newingroup": store.showNewSessionSheet(inGroup: store.sortedGroups.first?.id)
                 case "newgroup": store.showGroupSheet()
