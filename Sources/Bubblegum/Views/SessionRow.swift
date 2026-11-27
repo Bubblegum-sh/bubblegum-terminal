@@ -2,6 +2,7 @@ import SwiftUI
 import BubblegumCore
 
 /// One sidebar row (L-2, L-3): status dot, name, subtitle, and time/unread.
+/// Hovering (or tabbing to it) swaps the time/unread for a "…" menu with the row's actions.
 struct SessionRow: View {
     let session: Session
     let isSelected: Bool
@@ -14,6 +15,7 @@ struct SessionRow: View {
     @EnvironmentObject private var store: SessionStore
     @Environment(\.theme) private var theme
     @State private var hover = false
+    @FocusState private var menuFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
@@ -33,6 +35,8 @@ struct SessionRow: View {
 
             if !isRenaming {
                 meta
+                    .opacity(showsMenu ? 0 : 1)
+                    .overlay(alignment: .trailing) { menuButton }
             }
         }
         .background(
@@ -41,7 +45,29 @@ struct SessionRow: View {
         )
         .opacity(session.isArchived ? 0.72 : 1)
         .onHover { hover = $0 }
-        .contextMenu { contextMenu }
+        .contextMenu { SessionMenuItems(session: session) }
+    }
+
+    private var showsMenu: Bool { hover || menuFocused }
+
+    /// Same spot as a group heading's "…": 3 + 22/2 = 14 pt from the edge, over the unread dot.
+    private var menuButton: some View {
+        Menu {
+            SessionMenuItems(session: session)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.text2)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 22, height: 22)
+        .focused($menuFocused)
+        .opacity(showsMenu ? 1 : 0)
+        .padding(.trailing, 3)
+        .help("\(session.name) actions")
+        .accessibilityLabel("\(session.name) actions")
     }
 
     private var content: some View {
@@ -104,27 +130,6 @@ struct SessionRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
-    }
-
-    // MARK: Context menu (L-7)
-
-    @ViewBuilder
-    private var contextMenu: some View {
-        if session.isArchived {
-            Button("Unarchive") { store.toggleArchive(session.id) }
-            Button("Rename…") { store.beginRename(session.id) }
-            Button("Export…") { store.exportSession(session.id) }
-            Divider()
-            Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
-        } else {
-            Button("Rename…") { store.beginRename(session.id) }
-            Button("Archive") { store.toggleArchive(session.id) }
-            Divider()
-            Button("Restart Session") { store.requestRestart(session.id) }
-            Button("Export…") { store.exportSession(session.id) }
-            Divider()
-            Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
-        }
     }
 
     private var accessibilityText: String {
@@ -221,5 +226,27 @@ struct RenameField: View {
         else { return false }
         return hit === editor || hit.isDescendant(of: editor)
             || (editor.delegate as? NSView).map { hit === $0 || hit.isDescendant(of: $0) } ?? false
+    }
+}
+
+/// A session's actions (L-7): the row's "…" menu and its right-click menu.
+struct SessionMenuItems: View {
+    let session: Session
+    @EnvironmentObject private var store: SessionStore
+
+    var body: some View {
+        if session.isArchived {
+            Button { store.toggleArchive(session.id) } label: { Label("Unarchive", systemImage: "tray.and.arrow.up") }
+            Button { store.beginRename(session.id) } label: { Label("Rename…", systemImage: "pencil") }
+            Button { store.exportSession(session.id) } label: { Label("Export…", systemImage: "square.and.arrow.up") }
+        } else {
+            Button { store.beginRename(session.id) } label: { Label("Rename…", systemImage: "pencil") }
+            Button { store.toggleArchive(session.id) } label: { Label("Archive", systemImage: "archivebox") }
+            Divider()
+            Button { store.requestRestart(session.id) } label: { Label("Restart Session", systemImage: "arrow.clockwise") }
+            Button { store.exportSession(session.id) } label: { Label("Export…", systemImage: "square.and.arrow.up") }
+        }
+        Divider()
+        Button(role: .destructive) { store.requestDelete(session.id) } label: { Label("Delete Session…", systemImage: "trash") }
     }
 }
