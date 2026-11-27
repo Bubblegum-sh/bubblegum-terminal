@@ -72,9 +72,15 @@ struct SessionDetailView: View {
         HStack(spacing: 10) {
             if let s = store.selected {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(s.name)
-                        .font(TFFont.toolbarTitle)
-                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text(s.name)
+                            .font(TFFont.toolbarTitle)
+                            .lineLimit(1)
+                        // The session's group, right after its name (archived sessions too).
+                        if let g = store.group(s.groupId) {
+                            GroupChip(group: g, sessionId: s.id)
+                        }
+                    }
                     Text(pathLine(s))
                         .font(TFFont.path)
                         .foregroundStyle(theme.text2)
@@ -84,9 +90,6 @@ struct SessionDetailView: View {
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
                 BranchPill(git: store.git, isOpen: $branchOpen)
-                if let g = store.group(s.groupId) {
-                    GroupChip(group: g, sessionId: s.id)
-                }
                 StatusPill(session: s)
                 if let info = s.modelInfo {
                     ModelPill(info: info)

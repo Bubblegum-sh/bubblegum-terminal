@@ -212,8 +212,8 @@ struct GroupSheetView: View {
     private func cancel() { store.closeGroupSheet() }
 }
 
-/// Session header chip for a grouped session: colour + name. Clicking opens the Create group
-/// sheet with "Move <session> into this group".
+/// Session header chip for a grouped session, right after its name: colour + name. Clicking
+/// opens the Create group sheet with "Move <session> into this group".
 struct GroupChip: View {
     let group: SessionGroup
     let sessionId: UUID
@@ -225,13 +225,13 @@ struct GroupChip: View {
         Button {
             store.showGroupSheet(movingSession: sessionId)
         } label: {
-            HStack(spacing: 6) {
-                GroupSwatch(color: group.color, size: 8)
+            HStack(spacing: 5) {
+                GroupSwatch(color: group.color, size: 7)
                 Text(group.name).font(.system(size: 11, weight: .medium)).lineLimit(1)
             }
-            .padding(.vertical, 4)
-            .padding(.leading, 8)
-            .padding(.trailing, 10)
+            .padding(.vertical, 1)
+            .padding(.leading, 6)
+            .padding(.trailing, 8)
             .background(Capsule().fill(hover ? theme.elevatedC : .clear))
             .overlay(Capsule().stroke(theme.borderC))
             .contentShape(Capsule())
