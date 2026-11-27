@@ -32,36 +32,36 @@ struct GroupHeader: View {
         .padding(.top, 6)
     }
 
+    /// A tap gesture, not a Button, so the heading can be dragged to reorder groups.
     private var toggle: some View {
-        Button {
-            store.toggleCollapsed(group.id)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(theme.text3)
-                    .rotationEffect(.degrees(isOpen ? 90 : 0))
-                GroupSwatch(color: group.color)
-                Text(group.name.uppercased())
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .foregroundStyle(theme.groupC(group.color))
-                Text("· \(count)")
-                    .foregroundStyle(theme.groupC(group.color))
-                    .fixedSize()
-                Spacer(minLength: 0)
-                if needsAttention {
-                    Circle().fill(theme.accentC).frame(width: 8, height: 8)
-                        .padding(.trailing, 2)
-                        .help("A session in this group needs your attention")
-                }
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(theme.text3)
+                .rotationEffect(.degrees(isOpen ? 90 : 0))
+            GroupSwatch(color: group.color)
+            Text(group.name.uppercased())
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(theme.groupC(group.color))
+            Text("· \(count)")
+                .foregroundStyle(theme.groupC(group.color))
+                .fixedSize()
+            Spacer(minLength: 0)
+            if needsAttention {
+                Circle().fill(theme.accentC).frame(width: 8, height: 8)
+                    .padding(.trailing, 2)
+                    .help("A session in this group needs your attention")
             }
-            .font(TFFont.groupLabel)
-            .tracking(0.6)
-            .padding(8)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .font(TFFont.groupLabel)
+        .tracking(0.6)
+        .padding(8)
+        .contentShape(Rectangle())
+        .onTapGesture { store.toggleCollapsed(group.id) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityAction { store.toggleCollapsed(group.id) }
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(GroupNaming.title(group.name)), \(count) \(count == 1 ? "session" : "sessions")"
                             + (needsAttention ? ", needs attention" : ""))
         .accessibilityValue(isOpen ? "expanded" : "collapsed")

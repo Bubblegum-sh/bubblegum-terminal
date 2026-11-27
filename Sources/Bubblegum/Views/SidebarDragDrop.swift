@@ -19,7 +19,7 @@ struct SidebarDragDrop: ViewModifier {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
             .overlay { mark }
             .modifier(DragSource(drag: drag, enabled: drag != nil && store.query.isEmpty) { store.sidebarDrag = $0 })
-            .onDrop(of: [.plainText], delegate: SidebarDropDelegate(item: item, height: height, store: store))
+            .onDrop(of: [.bubblegumSidebarItem], delegate: SidebarDropDelegate(item: item, height: height, store: store))
     }
 
     @ViewBuilder
@@ -58,7 +58,14 @@ private struct DragSource: ViewModifier {
                 case .session(let s): id = s
                 case .group(let g): id = g
                 }
-                return NSItemProvider(object: id.uuidString as NSString)
+                // Our own type, visible only inside the app: other apps' drags (text, files)
+                // never land here and can't replay a drag that was cancelled.
+                let provider = NSItemProvider()
+                provider.registerDataRepresentation(forTypeIdentifier: UTType.bubblegumSidebarItem.identifier, visibility: .ownProcess) { done in
+                    done(Data(id.uuidString.utf8), nil)
+                    return nil
+                }
+                return provider
             }
         } else {
             content
@@ -66,8 +73,12 @@ private struct DragSource: ViewModifier {
     }
 }
 
-/// The drag payload lives in the store (`sidebarDrag`), so drops are only accepted from our own
-/// sidebar; the item provider just carries the id as text.
+extension UTType {
+    /// A session row or group heading dragged inside the sidebar (declared in Info.plist).
+    static let bubblegumSidebarItem = UTType(exportedAs: "dev.bubblegum.sidebar-item")
+}
+
+/// The drag payload lives in the store (`sidebarDrag`); the item provider only marks the drag as ours.
 private struct SidebarDropDelegate: DropDelegate {
     let item: SidebarItem
     let height: CGFloat
@@ -79,7 +90,9 @@ private struct SidebarDropDelegate: DropDelegate {
                                         sessions: store.sessions, groups: store.groups)
     }
 
-    func validateDrop(info: DropInfo) -> Bool { store.sidebarDrag != nil && store.query.isEmpty }
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.bubblegumSidebarItem]) && store.sidebarDrag != nil && store.query.isEmpty
+    }
 
     func dropEntered(info: DropInfo) { store.dropMark = resolve(info)?.mark }
 

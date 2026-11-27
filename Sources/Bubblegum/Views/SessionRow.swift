@@ -20,15 +20,15 @@ struct SessionRow: View {
             if isRenaming {
                 renameField
             } else {
-                Button {
-                    store.select(session.id)
-                } label: {
-                    content
-                }
-                .buttonStyle(.plain)
-                .simultaneousGesture(TapGesture(count: 2).onEnded { store.beginRename(session.id) })
-                .accessibilityLabel(accessibilityText)
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                // A tap gesture, not a Button: on macOS a Button keeps the mouse press to itself,
+                // so the sidebar's drag (onDrag on this row) would never start.
+                content
+                    .onTapGesture { store.select(session.id) }
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { store.beginRename(session.id) })
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilityText)
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityAction { store.select(session.id) }
             }
 
             if isSelected && !isRenaming {
