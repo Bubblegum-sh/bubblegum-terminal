@@ -11,6 +11,7 @@ public enum SidebarItem: Equatable, Identifiable {
     case ungrouped(count: Int)
     /// "New group…" button at the end of the group list.
     case newGroup
+    /// Fixed "Archived · N" heading at the bottom, shown even when empty.
     case archivedToggle(count: Int, isOpen: Bool)
     case row(UUID)
 
@@ -52,11 +53,10 @@ public enum SidebarLayout {
         items += loose.map { .row($0.id) }
         items.append(.newGroup)
 
+        // Shown even when empty, like Ungrouped, so a session can always be dragged onto it.
         let archived = sessions.filter { $0.isArchived }
-        if !archived.isEmpty {
-            items.append(.archivedToggle(count: archived.count, isOpen: archivedOpen))
-            if archivedOpen { items += archived.map { .row($0.id) } }
-        }
+        items.append(.archivedToggle(count: archived.count, isOpen: archivedOpen))
+        if archivedOpen { items += archived.map { .row($0.id) } }
         return items
     }
 

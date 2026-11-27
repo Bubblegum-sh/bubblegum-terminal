@@ -210,7 +210,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         let items = SidebarLayout.items(sessions: [a, b, c, d], query: "", archivedOpen: true)
         #expect(items == [.ungrouped(count: 3), .row(a.id), .row(b.id), .row(c.id), .newGroup, .archivedToggle(count: 1, isOpen: true), .row(d.id)])
         let closed = SidebarLayout.items(sessions: [b], query: "", archivedOpen: false)
-        #expect(closed == [.ungrouped(count: 1), .row(b.id), .newGroup])
+        #expect(closed == [.ungrouped(count: 1), .row(b.id), .newGroup, .archivedToggle(count: 0, isOpen: false)])
     }
 
     @Test func searchIncludesArchived() {
@@ -297,7 +297,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         try Data(legacy.utf8).write(to: url)
         let loaded = try #require(PersistedState.load(from: url))
         #expect(loaded.sessions.map(\.id) == [id])
-        #expect(SidebarLayout.items(sessions: loaded.sessions, query: "", archivedOpen: true) == [.ungrouped(count: 1), .row(id), .newGroup])
+        #expect(SidebarLayout.items(sessions: loaded.sessions, query: "", archivedOpen: true) == [.ungrouped(count: 1), .row(id), .newGroup, .archivedToggle(count: 0, isOpen: true)])
     }
 
     @Test func toleratesMissingFieldsAndSkipsBadSessions() throws {
@@ -373,9 +373,12 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         #expect(Set(items.map(\.id)).count == items.count) // ids unique for ForEach
     }
 
-    @Test func noArchivedSessionsMeansNoToggle() {
+    @Test func ungroupedAndArchivedShowEvenWhenEmpty() {
+        // Both stay visible as drop targets (drag onto Ungrouped / Archived).
+        #expect(SidebarLayout.items(sessions: [], query: "", archivedOpen: true)
+                == [.ungrouped(count: 0), .newGroup, .archivedToggle(count: 0, isOpen: true)])
         let items = SidebarLayout.items(sessions: active, query: "", archivedOpen: true)
-        #expect(!items.contains { if case .archivedToggle = $0 { return true } else { return false } })
+        #expect(items.last == .archivedToggle(count: 0, isOpen: true))
     }
 
     @Test func searchSpansBothGroupsInCreationOrder() {
