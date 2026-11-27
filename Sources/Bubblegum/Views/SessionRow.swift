@@ -144,6 +144,7 @@ struct SessionRow: View {
 }
 
 /// Inline text field: Enter saves, Esc cancels, empty name is rejected.
+/// Clicking outside the field (or moving focus away) saves; an empty name is reverted.
 private struct RenameField: View {
     let initial: String
     let onCommit: (String) -> Bool
@@ -151,6 +152,8 @@ private struct RenameField: View {
 
     @State private var text = ""
     @State private var rejected = false
+    @State private var done = false
+    @State private var clickMonitor: Any?
     @FocusState private var focused: Bool
     @Environment(\.theme) private var theme
 
@@ -168,15 +171,60 @@ private struct RenameField: View {
             .onAppear {
                 text = initial
                 DispatchQueue.main.async { focused = true }
+                installClickMonitor()
             }
+            .onDisappear { removeClickMonitor() }
             .onSubmit {
-                if !onCommit(text) {
+                guard !done else { return }
+                if onCommit(text) {
+                    done = true
+                } else {
                     rejected = true
                     NSSound.beep()
                     focused = true
                 }
             }
-            .onExitCommand { onCancel() }
+            .onExitCommand { cancel() }
+            .onChange(of: focused) { was, isNow in
+                if was && !isNow { commitOrRevert() }
+            }
             .onChange(of: text) { _, _ in rejected = false }
+    }
+
+    private func cancel() {
+        guard !done else { return }
+        done = true
+        onCancel()
+    }
+
+    /// Leaving the field saves the name; an invalid (empty) one falls back to the old name.
+    private func commitOrRevert() {
+        guard !done else { return }
+        done = true
+        if !onCommit(text) { onCancel() }
+    }
+
+    /// Mouse-downs elsewhere don't always take focus from the field (e.g. empty sidebar
+    /// space or plain buttons), so watch clicks directly.
+    private func installClickMonitor() {
+        guard clickMonitor == nil else { return }
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { event in
+            if !Self.isInsideEditingField(event) { commitOrRevert() }
+            return event
+        }
+    }
+
+    private func removeClickMonitor() {
+        if let m = clickMonitor { NSEvent.removeMonitor(m) }
+        clickMonitor = nil
+    }
+
+    private static func isInsideEditingField(_ event: NSEvent) -> Bool {
+        guard let window = event.window,
+              let editor = window.firstResponder as? NSTextView, editor.isFieldEditor,
+              let hit = window.contentView?.hitTest(event.locationInWindow)
+        else { return false }
+        return hit === editor || hit.isDescendant(of: editor)
+            || (editor.delegate as? NSView).map { hit === $0 || hit.isDescendant(of: $0) } ?? false
     }
 }
