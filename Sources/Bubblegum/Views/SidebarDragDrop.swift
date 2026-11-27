@@ -18,7 +18,7 @@ struct SidebarDragDrop: ViewModifier {
         content
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
             .overlay { mark }
-            .modifier(DragSource(drag: drag, enabled: drag != nil && store.query.isEmpty) { store.sidebarDrag = $0 })
+            .modifier(DragSource(drag: drag) { store.beginSidebarDrag($0) })
             .onDrop(of: [.bubblegumSidebarItem], delegate: SidebarDropDelegate(item: item, height: height, store: store))
     }
 
@@ -44,13 +44,15 @@ struct SidebarDragDrop: ViewModifier {
     }
 }
 
+/// Attached for the item's whole life (whether it is draggable depends only on its kind), so
+/// starting or ending a rename or a search never rebuilds the row and resets its hover/menu
+/// state. Whether a drag counts is decided when it starts (`SessionStore.beginSidebarDrag`).
 private struct DragSource: ViewModifier {
     let drag: SidebarDragItem?
-    let enabled: Bool
     let begin: (SidebarDragItem) -> Void
 
     func body(content: Content) -> some View {
-        if enabled, let drag {
+        if let drag {
             content.onDrag {
                 begin(drag)
                 let id: UUID
@@ -102,8 +104,10 @@ private struct SidebarDropDelegate: DropDelegate {
         return DropProposal(operation: drop == nil ? .forbidden : .move)
     }
 
+    /// Always clears the mark: the pointer may have moved since the last update, so the mark
+    /// resolved here can differ from the one drawn. The next target's dropUpdated redraws its own.
     func dropExited(info: DropInfo) {
-        if let mark = resolve(info)?.mark, store.dropMark == mark { store.dropMark = nil }
+        store.dropMark = nil
     }
 
     func performDrop(info: DropInfo) -> Bool {

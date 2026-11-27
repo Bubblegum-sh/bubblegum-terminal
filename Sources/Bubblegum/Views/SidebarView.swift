@@ -173,11 +173,12 @@ struct SidebarView: View {
         }
     }
 
-    /// Session rows and group headings can be dragged (not while renaming them).
+    /// Session rows and group headings can be dragged (the store ignores a drag that starts
+    /// while renaming that item or searching).
     private func dragItem(_ item: SidebarItem) -> SidebarDragItem? {
         switch item {
-        case .row(let id): return store.renamingId == id ? nil : .session(id)
-        case .group(let id, _, _, _): return store.renamingGroupId == id ? nil : .group(id)
+        case .row(let id): return .session(id)
+        case .group(let id, _, _, _): return .group(id)
         default: return nil
         }
     }

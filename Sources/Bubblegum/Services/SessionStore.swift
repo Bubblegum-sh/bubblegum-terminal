@@ -55,6 +55,7 @@ final class SessionStore: ObservableObject {
     private let installer: HookInstaller
     private var watcher: HookEventWatcher?
     private var started = false
+    private var mouseDownMonitor: Any?
 
     init(paths: AppPaths = .standard) {
         self.paths = paths
@@ -91,6 +92,10 @@ final class SessionStore: ObservableObject {
             self?.handle(events)
         }
         watcher?.start()
+        mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            self?.clearStaleSidebarDrag()
+            return event
+        }
         git.start()
         git.track(selected?.directory)
 
@@ -486,6 +491,24 @@ final class SessionStore: ObservableObject {
     func moveGroup(_ id: UUID, before: UUID?) {
         GroupOps.moveGroup(id, before: before, groups: &groups)
         persist()
+    }
+
+    /// A drag starting on a session row or group heading. Ignored (no drop will accept it) while
+    /// that item is being renamed or a search is shown.
+    func beginSidebarDrag(_ drag: SidebarDragItem) {
+        dropMark = nil
+        switch drag {
+        case .session(let id) where renamingId == id: sidebarDrag = nil
+        case .group(let id) where renamingGroupId == id: sidebarDrag = nil
+        default: sidebarDrag = query.isEmpty ? drag : nil
+        }
+    }
+
+    /// A drag cancelled with Esc or dropped outside the sidebar never reaches performDrop, so
+    /// its state is cleared on the next click.
+    private func clearStaleSidebarDrag() {
+        if sidebarDrag != nil { sidebarDrag = nil }
+        if dropMark != nil { dropMark = nil }
     }
 
     func perform(_ action: SidebarDropAction) {
