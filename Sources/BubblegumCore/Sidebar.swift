@@ -44,9 +44,13 @@ public enum SidebarLayout {
         items.compactMap { if case .row(let id) = $0 { return id } else { return nil } }
     }
 
-    /// Case-insensitive substring match on name, subtitle and folder path.
+    /// Case-insensitive substring match on name, folder path, and the subtitle's own text
+    /// (Claude's terminal title or question). Not the status words the subtitle falls back to
+    /// ("Paused · …", "Session ended"): "pa" would otherwise match every paused session.
     public static func matches(_ s: Session, query: String) -> Bool {
-        let haystack = [s.name, s.subtitle, s.directory, s.displayPath]
+        var haystack = [s.name, s.directory, s.displayPath]
+        if s.status == .waiting, let m = s.lastMessage { haystack.append(m) }
+        if s.status.isRunning, let t = Session.cleanTitle(s.terminalTitle) { haystack.append(t) }
         return haystack.contains { $0.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
     }
 }

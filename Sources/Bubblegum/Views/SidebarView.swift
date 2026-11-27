@@ -25,17 +25,24 @@ struct SidebarView: View {
 
             searchField
 
-            ScrollView {
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(store.sidebarItems) { item in
-                            itemView(item, now: context.date)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        LazyVStack(alignment: .leading, spacing: 2) {
+                            ForEach(store.sidebarItems) { item in
+                                itemView(item, now: context.date)
+                            }
                         }
                     }
                 }
+                .scrollIndicators(.never)
+                .accessibilityLabel("Sessions")
+                // Keep the selected row in view in long lists: ⌘↓/⌘↑, ⌘1…9, the quick
+                // switcher and notification clicks can select a row that is scrolled away.
+                .onAppear { reveal(store.selectedId, proxy, animated: false) }
+                .onChange(of: store.selectedId) { _, id in reveal(id, proxy, animated: true) }
+                .onChange(of: store.archivedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
             }
-            .scrollIndicators(.never)
-            .accessibilityLabel("Sessions")
 
             footer
         }
@@ -43,6 +50,28 @@ struct SidebarView: View {
         .padding(.bottom, 12)
         .background(theme.sidebarC)
         .onChange(of: store.searchFocusRequest) { _, _ in searchFocused = true }
+    }
+
+    /// Scrolls just enough to show the row (anchor nil), and only when it is in the list.
+    private func reveal(_ id: UUID?, _ proxy: ScrollViewProxy, animated: Bool) {
+        guard let id, store.visibleIds.contains(id) else { return }
+        // For the first row, go all the way up so its group label shows too.
+        let items = store.sidebarItems
+        let key = store.visibleIds.first == id ? (items.first?.id ?? SidebarItem.row(id).id) : SidebarItem.row(id).id
+        // After this update, so a row just added (new session, expanded archive) exists.
+        // The lazy stack only estimates heights of rows it hasn't built, so a far jump can land
+        // short; a second pass once those rows are laid out puts the row fully in view.
+        DispatchQueue.main.async {
+            if animated {
+                withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(key) }
+            } else {
+                proxy.scrollTo(key)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.25 : 0.05)) {
+                guard store.selectedId == id else { return }
+                proxy.scrollTo(key)
+            }
+        }
     }
 
     // MARK: Search (F-1)

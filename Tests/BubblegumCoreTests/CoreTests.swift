@@ -342,6 +342,102 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     }
 }
 
+/// Long lists: hundreds of sessions, active and archived mixed together in creation order.
+@Suite struct LongListTests {
+    /// 300 active + 200 archived; every 5th session (from index 2) is archived, so the two groups interleave.
+    static func makeSessions(_ count: Int = 500) -> [Session] {
+        (0..<count).map { i in
+            Session(name: "Session \(i)", directory: "/code/project-\(i % 37)", isArchived: i % 5 == 2 || i % 5 == 4)
+        }
+    }
+
+    let sessions = LongListTests.makeSessions()
+    var active: [Session] { sessions.filter { !$0.isArchived } }
+    var archived: [Session] { sessions.filter(\.isArchived) }
+
+    @Test func groupsKeepCreationOrderAndCounts() {
+        #expect(active.count == 300 && archived.count == 200)
+        let items = SidebarLayout.items(sessions: sessions, query: "", archivedOpen: true)
+        let expected: [SidebarItem] = [.label("Sessions · 300")] + active.map { .row($0.id) }
+            + [.archivedToggle(count: 200, isOpen: true)] + archived.map { .row($0.id) }
+        #expect(items == expected)
+        // ⌘1…⌘9 / next / previous walk active first, then archived.
+        #expect(SidebarLayout.visibleIds(items) == active.map(\.id) + archived.map(\.id))
+    }
+
+    @Test func collapsedArchiveHidesOnlyArchivedRows() {
+        let items = SidebarLayout.items(sessions: sessions, query: "", archivedOpen: false)
+        #expect(items.count == 1 + 300 + 1)
+        #expect(items.last == .archivedToggle(count: 200, isOpen: false))
+        #expect(SidebarLayout.visibleIds(items) == active.map(\.id))
+        #expect(Set(items.map(\.id)).count == items.count) // ids unique for ForEach
+    }
+
+    @Test func noArchivedSessionsMeansNoToggle() {
+        let items = SidebarLayout.items(sessions: active, query: "", archivedOpen: true)
+        #expect(!items.contains { if case .archivedToggle = $0 { return true } else { return false } })
+    }
+
+    @Test func searchSpansBothGroupsInCreationOrder() {
+        // "Session 4" matches 4, 40…49, 400…499: 1 + 10 + 100 sessions.
+        let items = SidebarLayout.items(sessions: sessions, query: "session 4", archivedOpen: false)
+        let hits = sessions.filter { $0.name == "Session 4" || $0.name.hasPrefix("Session 4") }
+        #expect(hits.count == 111)
+        #expect(items == [.label("Results · 111")] + hits.map { .row($0.id) })
+        #expect(hits.contains(where: \.isArchived) && hits.contains { !$0.isArchived })
+        // Folder search: project-36 is used by sessions 36, 73, 110, …
+        let folder = SidebarLayout.items(sessions: sessions, query: "project-36", archivedOpen: false)
+        #expect(SidebarLayout.visibleIds(folder) == sessions.filter { $0.directory == "/code/project-36" }.map(\.id))
+    }
+
+    @Test func searchIgnoresStatusWordsInSubtitle() {
+        // Every session is Paused ("Paused · /code/…"); "pa" must not match them all.
+        let items = SidebarLayout.items(sessions: sessions, query: "pa", archivedOpen: true)
+        #expect(items == [.label("No sessions match")])
+        #expect(SidebarLayout.items(sessions: sessions, query: "ended", archivedOpen: true) == [.label("No sessions match")])
+        // The subtitle's own text still matches: Claude's terminal title and its question.
+        var working = Session(name: "api", directory: "/code/api", status: .working)
+        working.terminalTitle = "✳ Fix the parser"
+        var waiting = Session(name: "web", directory: "/code/web", status: .waiting)
+        waiting.lastMessage = "Claude needs your permission to use Bash"
+        #expect(SidebarLayout.matches(working, query: "parser"))
+        #expect(SidebarLayout.matches(waiting, query: "permission"))
+        #expect(!SidebarLayout.matches(working, query: "working"))
+    }
+
+    @Test func quickSwitcherWithEmptyQueryListsOnlyActive() {
+        #expect(QuickSwitcherFilter.matches(sessions: sessions, query: "").map(\.id) == active.map(\.id))
+        // A query still finds archived sessions.
+        let m = QuickSwitcherFilter.matches(sessions: sessions, query: "Session 499")
+        #expect(m.map(\.id) == [sessions[499].id] && sessions[499].isArchived)
+    }
+
+    @Test func persistenceRoundTripKeepsOrderAndArchiveFlags() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("bubblegum-long-\(UUID()).json")
+        try PersistedState(sessions: sessions, selectedId: sessions[499].id, archivedOpen: false).save(to: url)
+        let r = PersistedState.loadForApp(from: url)
+        let loaded = try #require(r.state)
+        #expect(r.backup == nil)
+        #expect(loaded.sessions.map(\.id) == sessions.map(\.id))
+        #expect(loaded.sessions.map(\.isArchived) == sessions.map(\.isArchived))
+        #expect(loaded.selectedId == sessions[499].id && !loaded.archivedOpen)
+    }
+
+    @Test func layoutStaysFastForThousandsOfSessions() {
+        // The sidebar recomputes this on every store change (title updates, hook events), so
+        // it must stay linear. 5,000 sessions, layout + search, well under the limit.
+        let many = LongListTests.makeSessions(5_000)
+        let clock = ContinuousClock()
+        let elapsed = clock.measure {
+            for _ in 0..<10 {
+                _ = SidebarLayout.items(sessions: many, query: "", archivedOpen: true)
+                _ = SidebarLayout.items(sessions: many, query: "project-12", archivedOpen: true)
+            }
+        }
+        #expect(elapsed < .seconds(2), "10× layout + search of 5,000 sessions took \(elapsed)")
+    }
+}
+
 @Suite struct RecentProjectsTests {
     let home = "/Users/me"
     let now = Date(timeIntervalSince1970: 1_800_000_000)
