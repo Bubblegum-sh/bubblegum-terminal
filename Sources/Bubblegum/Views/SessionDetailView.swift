@@ -84,6 +84,9 @@ struct SessionDetailView: View {
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
                 BranchPill(git: store.git, isOpen: $branchOpen)
+                if let g = store.group(s.groupId) {
+                    GroupChip(group: g, sessionId: s.id)
+                }
                 StatusPill(session: s)
                 if let info = s.modelInfo {
                     ModelPill(info: info)
