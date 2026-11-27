@@ -18,6 +18,7 @@ the list tidy with search, rename and archive.
 - **Model and effort** of the last answer in the header, e.g. *Opus 5.5 · High effort*.
 - **Branch switcher** in the toolbar: see the session folder's git branch and uncommitted changes, search local and remote branches, switch, or create a new branch.
 - **New session sheet** (⌘T): open a project folder, start a blank session, or reopen one of your recent projects with ⌘1–⌘9.
+- **Session groups:** sort sessions into named, coloured groups. Collapse a group and a dot still tells you when a session in it needs you. Drag sessions between groups, reorder them, or drag groups to reorder; start a new session straight into a group from its menu.
 - **Organize:** rename (click away to save), archive, delete; search all sessions (⌘F) or jump to one with the quick switcher (⌘K).
 - **Export** a session's whole conversation as a Markdown file (⇧⌘E).
 - **Resumes where you left off:** after a restart, opening a session continues its conversation (`claude --resume`).
