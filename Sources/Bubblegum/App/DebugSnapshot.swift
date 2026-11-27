@@ -30,6 +30,8 @@ enum DebugSnapshot {
                 case "first": if let id = store.visibleIds.first { store.select(id, focusTerminal: false) }
                 case "last": if let id = store.visibleIds.last { store.select(id, focusTerminal: false) }
                 case "togglearchived": store.archivedOpen.toggle()
+                case "collapsegroup": if let g = store.sortedGroups.first { store.toggleCollapsed(g.id) }
+                case "renamegroup": if let g = store.sortedGroups.first { store.beginRenameGroup(g.id) }
                 case "colors":
                     let c = NSColor.controlAccentColor.usingColorSpace(.sRGB)!
                     let h = NSColor.selectedContentBackgroundColor.usingColorSpace(.sRGB)!

@@ -130,13 +130,15 @@ struct SidebarView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
                 .padding(.horizontal, 8)
+        case .group(let id, let count, let isOpen, let attention):
+            if let g = store.group(id) {
+                GroupHeader(group: g, count: count, isOpen: isOpen, needsAttention: attention,
+                            isRenaming: store.renamingGroupId == id)
+            }
         case .ungrouped(let count):
-            GroupLabel(text: "Ungrouped · \(count)")
-                .padding(.top, 10)
-                .padding(.bottom, 4)
-                .padding(.horizontal, 8)
-        case .group, .newGroup:
-            EmptyView()
+            UngroupedHeader(count: count)
+        case .newGroup:
+            NewGroupButton()
         case .archivedToggle(let count, let isOpen):
             Button {
                 store.archivedOpen.toggle()
@@ -162,7 +164,9 @@ struct SidebarView: View {
                     session: s,
                     isSelected: store.selectedId == id,
                     isRenaming: store.renamingId == id,
-                    now: now
+                    now: now,
+                    // Rows under their own heading don't repeat the group.
+                    groupTag: (s.isArchived || !store.query.isEmpty) ? store.group(s.groupId) : nil
                 )
             }
         }

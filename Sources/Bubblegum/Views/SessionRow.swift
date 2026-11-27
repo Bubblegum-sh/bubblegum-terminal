@@ -7,6 +7,9 @@ struct SessionRow: View {
     let isSelected: Bool
     let isRenaming: Bool
     let now: Date
+    /// Shown as a small colour square after the name where rows are not under their
+    /// group heading (search results, Archived).
+    var groupTag: SessionGroup? = nil
 
     @EnvironmentObject private var store: SessionStore
     @Environment(\.theme) private var theme
@@ -47,11 +50,16 @@ struct SessionRow: View {
         HStack(spacing: 10) {
             StatusDot(status: session.status)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.name)
-                    .font(TFFont.rowName)
-                    .foregroundStyle(theme.text1)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 5) {
+                    Text(session.name)
+                        .font(TFFont.rowName)
+                        .foregroundStyle(theme.text1)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if let g = groupTag {
+                        GroupSwatch(color: g.color, size: 7).help(GroupNaming.title(g.name))
+                    }
+                }
                 Text(session.subtitle)
                     .font(TFFont.subtitle)
                     .foregroundStyle(theme.text2)
@@ -138,15 +146,19 @@ struct SessionRow: View {
 
     private var accessibilityText: String {
         var parts = [session.name, session.status.label, session.subtitle]
+        if let g = groupTag { parts.append(GroupNaming.title(g.name)) }
         if session.unread { parts.append("unread") }
         return parts.joined(separator: ", ")
     }
 }
 
-/// Inline text field: Enter saves, Esc cancels, empty name is rejected.
-/// Clicking outside the field (or moving focus away) saves; an empty name is reverted.
-private struct RenameField: View {
+/// Inline text field: Enter saves, Esc cancels, an invalid name is rejected.
+/// Clicking outside the field (or moving focus away) saves; an invalid name is reverted.
+/// Used for session rows and group headings.
+struct RenameField: View {
     let initial: String
+    var label = "Session name"
+    var font = TFFont.rowName
     let onCommit: (String) -> Bool
     let onCancel: () -> Void
 
@@ -158,16 +170,16 @@ private struct RenameField: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        TextField("Session name", text: $text)
+        TextField(label, text: $text)
             .textFieldStyle(.plain)
-            .font(TFFont.rowName)
+            .font(font)
             .foregroundStyle(theme.text1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(RoundedRectangle(cornerRadius: 5).fill(theme.terminalC))
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(rejected ? Color.red : theme.accentC, lineWidth: 1))
             .focused($focused)
-            .accessibilityLabel("Session name")
+            .accessibilityLabel(label)
             .onAppear {
                 text = initial
                 DispatchQueue.main.async { focused = true }
