@@ -7,7 +7,7 @@ status (Working, Needs you, Your turn), notifies you when Claude finishes or ask
 the list tidy with search, rename and archive.
 
 **[⬇ Download Bubblegum for Mac](https://github.com/ysafr7/bubblegum-terminal/releases/latest/download/Bubblegum.dmg)**
-· version 0.1.0 · macOS 14 Sonoma or later · Apple Silicon and Intel ·
+· version 0.3.0 · macOS 14 Sonoma or later · Apple Silicon and Intel ·
 [all releases](https://github.com/ysafr7/bubblegum-terminal/releases)
 
 ## Features
@@ -16,8 +16,9 @@ the list tidy with search, rename and archive.
 - **Live status from Claude Code's hooks.** Working, Needs you, Your turn, Ended: in the sidebar and the header.
 - **Notifications and a Dock badge** when a session you're not looking at finishes or needs an answer.
 - **Model and effort** of the last answer in the header, e.g. *Opus 5.5 · High effort*.
+- **Branch switcher** in the toolbar: see the session folder's git branch and uncommitted changes, search local and remote branches, switch, or create a new branch.
 - **New session sheet** (⌘T): open a project folder, start a blank session, or reopen one of your recent projects with ⌘1–⌘9.
-- **Organize:** rename, archive, delete; search all sessions (⌘F) or jump to one with the quick switcher (⌘K).
+- **Organize:** rename (click away to save), archive, delete; search all sessions (⌘F) or jump to one with the quick switcher (⌘K).
 - **Export** a session's whole conversation as a Markdown file (⇧⌘E).
 - **Resumes where you left off:** after a restart, opening a session continues its conversation (`claude --resume`).
 - **Dark and light themes**, adjustable terminal font size.
@@ -53,7 +54,7 @@ You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed an
 
 ## Your data
 
-- Bubblegum keeps its session list in `~/Library/Application Support/Bubblegum/` (`sessions.json`, `recents.json`).
+- Bubblegum keeps its session list in `~/Library/Application Support/Bubblegum/` (`sessions.json`, `recents.json`). If `sessions.json` can't be read, it is copied to `sessions.json.unreadable-<date>` before being replaced, so nothing is lost.
 - Conversations are stored by Claude Code itself in `~/.claude/projects/`; Bubblegum only reads them (to resume,
   show the model, and export). Deleting a session in Bubblegum never deletes Claude's transcript.
 - Uninstall: delete the app and that folder, and remove the `Bubblegum/hook.sh` entries from `~/.claude/settings.json`.

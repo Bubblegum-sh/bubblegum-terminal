@@ -763,7 +763,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let data = try Data(contentsOf: root.appendingPathComponent("Resources/Info.plist"))
         let plist = try #require(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
-        #expect(AppVersion.version == "0.2.0")
+        #expect(AppVersion.version == "0.3.0")
         #expect(plist["CFBundleShortVersionString"] as? String == AppVersion.version)
         #expect(plist["CFBundleVersion"] as? String == AppVersion.build)
         #expect(plist["NSHumanReadableCopyright"] as? String == AppVersion.copyright)
