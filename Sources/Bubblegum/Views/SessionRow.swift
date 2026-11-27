@@ -16,6 +16,7 @@ struct SessionRow: View {
     @Environment(\.theme) private var theme
     @State private var hover = false
     @FocusState private var menuFocused: Bool
+    @FocusState private var rowFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
@@ -24,9 +25,15 @@ struct SessionRow: View {
             } else {
                 // A tap gesture, not a Button: on macOS a Button keeps the mouse press to itself,
                 // so the sidebar's drag (onDrag on this row) would never start.
+                // Focusable like a button: Tab reaches it (per the system's keyboard navigation
+                // setting), Return or Space opens the session.
                 content
                     .onTapGesture { store.select(session.id) }
                     .simultaneousGesture(TapGesture(count: 2).onEnded { store.beginRename(session.id) })
+                    .focusable(interactions: .activate)
+                    .focused($rowFocused)
+                    .focusEffectDisabled()
+                    .onKeyPress(keys: [.return, .space]) { _ in store.select(session.id); return .handled }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(accessibilityText)
                     .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -43,6 +50,7 @@ struct SessionRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected ? theme.selectedRowC : (hover ? theme.elevatedC.opacity(0.5) : .clear))
         )
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.accentC, lineWidth: 2).opacity(rowFocused ? 1 : 0))
         .opacity(session.isArchived ? 0.72 : 1)
         .onHover { hover = $0 }
         .contextMenu { SessionMenuItems(session: session) }

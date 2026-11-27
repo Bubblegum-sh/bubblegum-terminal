@@ -15,6 +15,7 @@ struct GroupHeader: View {
     @Environment(\.theme) private var theme
     @State private var hover = false
     @FocusState private var menuFocused: Bool
+    @FocusState private var toggleFocused: Bool
 
     var body: some View {
         HStack(spacing: 0) {
@@ -56,6 +57,12 @@ struct GroupHeader: View {
         .padding(8)
         .contentShape(Rectangle())
         .onTapGesture { store.toggleCollapsed(group.id) }
+        // Focusable like a button: Tab reaches it, Return or Space collapses / expands.
+        .focusable(interactions: .activate)
+        .focused($toggleFocused)
+        .focusEffectDisabled()
+        .onKeyPress(keys: [.return, .space]) { _ in store.toggleCollapsed(group.id); return .handled }
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.accentC, lineWidth: 2).opacity(toggleFocused ? 1 : 0))
         .accessibilityElement(children: .ignore)
         .accessibilityAction { store.toggleCollapsed(group.id) }
         .accessibilityAddTraits(.isButton)
