@@ -290,15 +290,26 @@ final class SessionStore: ObservableObject {
     /// S-8: terminates the process and removes it; Claude's transcript on disk is untouched.
     func delete(_ id: UUID) {
         confirmDeleteId = nil
-        if renamingId == id { renamingId = nil }
-        terminals.remove(id)
-        notifier.clear(sessionId: id)
+        delete(Set([id]))
+    }
+
+    /// Removes several sessions in one pass (Delete group and its sessions). The selection moves
+    /// once, to the nearest visible session that is not being deleted, so no session that is
+    /// about to go away gets selected (and launched) on the way.
+    private func delete(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        if let r = renamingId, ids.contains(r) { renamingId = nil }
+        for id in ids {
+            terminals.remove(id)
+            notifier.clear(sessionId: id)
+        }
         let visible = visibleIds
-        sessions.removeAll { $0.id == id }
-        if selectedId == id {
-            let idx = visible.firstIndex(of: id) ?? 0
-            let remaining = visible.filter { $0 != id && session($0) != nil }
-            selectedId = remaining.isEmpty ? sessions.first?.id : remaining[min(idx, remaining.count - 1)]
+        sessions.removeAll { ids.contains($0.id) }
+        if let sel = selectedId, ids.contains(sel) {
+            let idx = visible.firstIndex(of: sel) ?? 0
+            let before = visible[..<min(idx, visible.count)].reversed().filter { session($0) != nil }
+            let after = visible[min(idx, visible.count)...].filter { session($0) != nil }
+            selectedId = after.first ?? before.first ?? sessions.first { !$0.isArchived }?.id ?? sessions.first?.id
             if let next = selectedId { select(next) }
         }
         persist()
@@ -447,7 +458,7 @@ final class SessionStore: ObservableObject {
         guard group(id) != nil else { return }
         if renamingGroupId == id { renamingGroupId = nil }
         if deleteSessions {
-            for s in GroupOps.allMembers(of: id, in: sessions) { delete(s.id) }
+            delete(Set(GroupOps.allMembers(of: id, in: sessions).map(\.id)))
         } else {
             GroupOps.ungroupAll(id, sessions: &sessions)
         }
