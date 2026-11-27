@@ -159,7 +159,7 @@ struct ModelPill: View {
             if let level = info.effortLevel, let label = info.effortLabel {
                 Rectangle().fill(theme.borderC).frame(width: 1, height: 12)
                 EffortBars(level: level)
-                Text("\(label) effort")
+                Text(label)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.text2)
                     .lineLimit(1)
