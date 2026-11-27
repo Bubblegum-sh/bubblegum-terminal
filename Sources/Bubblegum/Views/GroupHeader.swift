@@ -17,15 +17,17 @@ struct GroupHeader: View {
     @FocusState private var menuFocused: Bool
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             if isRenaming {
                 renameField
             } else {
                 toggle
-                menuButton
+                trailingSlot
             }
         }
-        .padding(.trailing, 4)
+        // 3 + 22/2 = 14 pt from the edge: the slot's centre lines up with the session rows'
+        // unread dots (8 pt dot, 10 pt from the edge).
+        .padding(.trailing, 3)
         .background(RoundedRectangle(cornerRadius: 6).fill(hover && !isRenaming ? theme.text3.opacity(0.08) : .clear))
         .onHover { hover = $0 }
         .contextMenu { if !isRenaming { GroupMenuItems(group: group) } }
@@ -48,11 +50,6 @@ struct GroupHeader: View {
                 .foregroundStyle(theme.groupC(group.color))
                 .fixedSize()
             Spacer(minLength: 0)
-            if needsAttention {
-                Circle().fill(theme.accentC).frame(width: 8, height: 8)
-                    .padding(.trailing, 2)
-                    .help("A session in this group needs your attention")
-            }
         }
         .font(TFFont.groupLabel)
         .tracking(0.6)
@@ -68,6 +65,21 @@ struct GroupHeader: View {
         .accessibilityAddTraits(.isHeader)
     }
 
+    private var showsMenu: Bool { hover || menuFocused }
+
+    /// Right edge: the attention dot, replaced by the "…" menu on hover or keyboard focus.
+    private var trailingSlot: some View {
+        ZStack {
+            if needsAttention && !showsMenu {
+                Circle().fill(theme.accentC).frame(width: 8, height: 8)
+                    .help("A session in this group needs your attention")
+                    .accessibilityHidden(true) // announced by the heading's label
+            }
+            menuButton
+        }
+        .frame(width: 22, height: 22)
+    }
+
     private var menuButton: some View {
         Menu {
             GroupMenuItems(group: group)
@@ -81,7 +93,7 @@ struct GroupHeader: View {
         .fixedSize()
         .frame(width: 22, height: 22)
         .focused($menuFocused)
-        .opacity(hover || menuFocused ? 1 : 0)
+        .opacity(showsMenu ? 1 : 0)
         .help("\(GroupNaming.title(group.name)) actions")
         .accessibilityLabel("\(GroupNaming.title(group.name)) actions")
     }
