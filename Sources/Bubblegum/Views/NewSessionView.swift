@@ -16,9 +16,7 @@ struct NewSessionView: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    Text("New session")
-                        .font(.system(size: 15, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
+                    title
                     Spacer()
                     Text("⌘T").font(.system(size: 11)).foregroundStyle(theme.text3)
                 }
@@ -82,12 +80,42 @@ struct NewSessionView: View {
             .shadow(color: .black.opacity(0.5), radius: 25, y: 20)
             .padding(.top, 110)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("New session")
+            .accessibilityLabel(group.map { "New session in \($0.name) group" } ?? "New session")
             .accessibilityAddTraits(.isModal)
         }
         .onAppear { DispatchQueue.main.async { filterFocused = true } }
         .onChange(of: store.newSessionFilter) { _, _ in store.newSessionIndex = 0 }
         .onExitCommand { store.closeNewSessionSheet() }
+    }
+
+    private var group: SessionGroup? { store.group(store.newSessionGroupId) }
+
+    /// "New session", or "New session in [■ Work] group" from a group's Add new session.
+    @ViewBuilder
+    private var title: some View {
+        if let g = group {
+            HStack(spacing: 7) {
+                Text("New session in")
+                HStack(spacing: 6) {
+                    GroupSwatch(color: g.color)
+                    Text(g.name).foregroundStyle(theme.groupC(g.color)).lineLimit(1)
+                }
+                .padding(.vertical, 2)
+                .padding(.leading, 7)
+                .padding(.trailing, 9)
+                .background(Capsule().fill(theme.sidebarC))
+                .overlay(Capsule().stroke(theme.borderC))
+                Text("group")
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("New session in \(g.name) group")
+            .accessibilityAddTraits(.isHeader)
+        } else {
+            Text("New session")
+                .font(.system(size: 15, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 
     // MARK: Filter field (keyboard focus lives here so typing filters)

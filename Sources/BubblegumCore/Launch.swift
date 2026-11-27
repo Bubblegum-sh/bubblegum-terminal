@@ -61,16 +61,21 @@ public enum LaunchCommand {
 /// sessions.json contents.
 public struct PersistedState: Codable, Equatable {
     public var sessions: [Session]
+    public var groups: [SessionGroup]
     public var selectedId: UUID?
     public var archivedOpen: Bool
+    public var ungroupedOpen: Bool
 
-    public init(sessions: [Session] = [], selectedId: UUID? = nil, archivedOpen: Bool = true) {
+    public init(sessions: [Session] = [], groups: [SessionGroup] = [], selectedId: UUID? = nil,
+                archivedOpen: Bool = true, ungroupedOpen: Bool = true) {
         self.sessions = sessions
+        self.groups = groups
         self.selectedId = selectedId
         self.archivedOpen = archivedOpen
+        self.ungroupedOpen = ungroupedOpen
     }
 
-    enum CodingKeys: String, CodingKey { case sessions, selectedId, archivedOpen }
+    enum CodingKeys: String, CodingKey { case sessions, groups, selectedId, archivedOpen, ungroupedOpen }
 
     /// Sessions that can't be decoded are skipped (counted in `skippedSessions`) rather than
     /// failing the whole file; the top level only needs a `sessions` array.
@@ -87,17 +92,36 @@ public struct PersistedState: Codable, Equatable {
                 _ = try? list.decode(Skip.self) // advance past the bad element
             }
         }
+        // Groups are optional (files from before groups have none); a bad group is dropped.
+        var groups: [SessionGroup] = []
+        if var g = try? c.nestedUnkeyedContainer(forKey: .groups) {
+            while !g.isAtEnd {
+                if let group = try? g.decode(SessionGroup.self) { groups.append(group) } else { _ = try? g.decode(Skip.self) }
+            }
+        }
+        self.groups = groups
+        // A session whose group is gone goes back to Ungrouped, after the sessions already there.
+        let known = Set(groups.map(\.id))
+        var next = GroupOps.nextOrder(in: nil, sessions: sessions)
+        for i in sessions.indices where sessions[i].groupId.map({ !known.contains($0) }) == true {
+            sessions[i].groupId = nil
+            sessions[i].order = next
+            next += 1
+        }
         self.sessions = sessions
         self.skippedSessions = skipped
         selectedId = try? c.decodeIfPresent(UUID.self, forKey: .selectedId)
         archivedOpen = (try? c.decodeIfPresent(Bool.self, forKey: .archivedOpen)) ?? true
+        ungroupedOpen = (try? c.decodeIfPresent(Bool.self, forKey: .ungroupedOpen)) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(sessions, forKey: .sessions)
+        try c.encode(groups, forKey: .groups)
         try c.encodeIfPresent(selectedId, forKey: .selectedId)
         try c.encode(archivedOpen, forKey: .archivedOpen)
+        try c.encode(ungroupedOpen, forKey: .ungroupedOpen)
     }
 
     /// Not persisted: how many sessions in the loaded file could not be read.
@@ -107,7 +131,8 @@ public struct PersistedState: Codable, Equatable {
     private struct Skip: Decodable { init(from decoder: Decoder) {} }
 
     public static func == (a: PersistedState, b: PersistedState) -> Bool {
-        a.sessions == b.sessions && a.selectedId == b.selectedId && a.archivedOpen == b.archivedOpen
+        a.sessions == b.sessions && a.groups == b.groups && a.selectedId == b.selectedId && a.archivedOpen == b.archivedOpen
+            && a.ungroupedOpen == b.ungroupedOpen
     }
 
     /// Parses sessions.json. nil when the file is missing or unreadable; never touches the file.

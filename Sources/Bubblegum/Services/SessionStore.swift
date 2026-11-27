@@ -13,8 +13,10 @@ final class SessionStore: ObservableObject {
     @Published private(set) var selectedId: UUID? {
         didSet { if selectedId != oldValue { git.track(selected?.directory) } }
     }
+    @Published private(set) var groups: [SessionGroup] = []
     @Published var query: String = ""
     @Published var archivedOpen: Bool = true { didSet { if archivedOpen != oldValue { persist() } } }
+    @Published var ungroupedOpen: Bool = true { didSet { if ungroupedOpen != oldValue { persist() } } }
 
     // UI state
     @Published var renamingId: UUID?
@@ -31,6 +33,17 @@ final class SessionStore: ObservableObject {
     @Published var errorTitle = "Something went wrong"
     @Published var confirmRestartId: UUID?
     @Published var confirmDeleteId: UUID?
+    /// Group heading being renamed inline.
+    @Published var renamingGroupId: UUID?
+    /// Group waiting for the Delete group confirmation.
+    @Published var confirmDeleteGroupId: UUID?
+    /// The Create group sheet, when open.
+    @Published var groupSheet: GroupSheetRequest?
+    /// Sidebar drag in progress, and where its drop would land.
+    @Published var sidebarDrag: SidebarDragItem?
+    @Published var dropMark: SidebarDropMark?
+    /// Set while the New session sheet was opened from a group's "Add new session".
+    @Published private(set) var newSessionGroupId: UUID?
     /// Incremented to ask the sidebar to focus the search field (⌘F).
     @Published private(set) var searchFocusRequest = 0
     /// Incremented to ask the terminal host to take keyboard focus (T-2).
@@ -43,6 +56,7 @@ final class SessionStore: ObservableObject {
     private let installer: HookInstaller
     private var watcher: HookEventWatcher?
     private var started = false
+    private var mouseDownMonitor: Any?
 
     init(paths: AppPaths = .standard) {
         self.paths = paths
@@ -52,8 +66,10 @@ final class SessionStore: ObservableObject {
         let loaded = PersistedState.loadForApp(from: paths.sessionsFile)
         if let state = loaded.state {
             sessions = state.sessions.map { var s = $0; s.status = .paused; return s }
+            groups = state.groups
             selectedId = state.selectedId.flatMap { id in sessions.contains { $0.id == id } ? id : nil }
             archivedOpen = state.archivedOpen
+            ungroupedOpen = state.ungroupedOpen
         }
         if let backup = loaded.backup {
             let what = loaded.state == nil ? "Saved sessions couldn’t be read" : "Some saved sessions couldn’t be read"
@@ -78,6 +94,10 @@ final class SessionStore: ObservableObject {
             self?.handle(events)
         }
         watcher?.start()
+        mouseDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            self?.clearStaleSidebarDrag()
+            return event
+        }
         git.start()
         git.track(selected?.directory)
 
@@ -102,10 +122,18 @@ final class SessionStore: ObservableObject {
     var selected: Session? { session(selectedId) }
 
     var sidebarItems: [SidebarItem] {
-        SidebarLayout.items(sessions: sessions, query: query, archivedOpen: archivedOpen)
+        SidebarLayout.items(sessions: sessions, groups: groups, query: query, archivedOpen: archivedOpen, ungroupedOpen: ungroupedOpen)
     }
 
     var visibleIds: [UUID] { SidebarLayout.visibleIds(sidebarItems) }
+
+    func group(_ id: UUID?) -> SessionGroup? {
+        guard let id else { return nil }
+        return groups.first { $0.id == id }
+    }
+
+    /// Groups in sidebar order.
+    var sortedGroups: [SessionGroup] { GroupOps.sorted(groups) }
 
     private func isFocused(_ id: UUID) -> Bool {
         NSApp.isActive && selectedId == id
@@ -113,9 +141,11 @@ final class SessionStore: ObservableObject {
 
     // MARK: Create / open
 
-    /// S-1: ⌘T or "+" opens the New session sheet.
-    func showNewSessionSheet() {
+    /// S-1: ⌘T or "+" opens the New session sheet. From a group's "Add new session" it is
+    /// titled for that group and the new session goes into it; any other way, Ungrouped.
+    func showNewSessionSheet(inGroup groupId: UUID? = nil) {
         showQuickSwitcher = false
+        newSessionGroupId = group(groupId)?.id
         if recents.prune() { saveRecents() }
         newSessionFilter = ""
         newSessionIndex = 0
@@ -124,6 +154,7 @@ final class SessionStore: ObservableObject {
 
     func closeNewSessionSheet() {
         showNewSession = false
+        newSessionGroupId = nil
         terminalFocusRequest += 1
     }
 
@@ -135,11 +166,18 @@ final class SessionStore: ObservableObject {
         return sessions.filter { ($0.directory as NSString).standardizingPath == p }.count
     }
 
+    /// The group a session created right now goes into: the sheet's group while it is open.
+    private func takeNewSessionGroup() -> UUID? {
+        defer { newSessionGroupId = nil }
+        return showNewSession ? newSessionGroupId : nil
+    }
+
     /// Opening a recent project always creates a new session in that folder.
     func openRecent(at index: Int) {
         let list = visibleRecents
         guard list.indices.contains(index) else { return }
         let path = list[index].path
+        let groupId = takeNewSessionGroup()
         showNewSession = false
         guard RecentProjects.directoryExists(path) else {
             recents.prune()
@@ -147,18 +185,20 @@ final class SessionStore: ObservableObject {
             showError("Project folder not found", "\(Session.abbreviate(path)) no longer exists.")
             return
         }
-        createSession(directory: path)
+        createSession(directory: path, groupId: groupId)
     }
 
     /// Blank session (⌘N): no project, starts in the home folder.
     func startBlankSession() {
+        let groupId = takeNewSessionGroup()
         showNewSession = false
         let name = SessionNaming.unique(SessionNaming.blankSessionName, existing: sessions.map(\.name))
-        createSession(directory: NSHomeDirectory(), name: name)
+        createSession(directory: NSHomeDirectory(), name: name, groupId: groupId)
     }
 
     /// Open project… (⌘O): folder picker.
     func openProjectWithPicker() {
+        let groupId = takeNewSessionGroup()
         showNewSession = false
         showQuickSwitcher = false
         let panel = NSOpenPanel()
@@ -170,22 +210,32 @@ final class SessionStore: ObservableObject {
         panel.message = "Choose a project folder to run Claude Code in"
         if let dir = selected?.directory { panel.directoryURL = URL(fileURLWithPath: dir) }
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        createSession(directory: url.path)
+        createSession(directory: url.path, groupId: groupId)
     }
 
-    func createSession(directory: String, name: String? = nil) {
+    func createSession(directory: String, name: String? = nil, groupId: UUID? = nil) {
         let name = name ?? SessionNaming.unique(SessionNaming.defaultName(for: directory), existing: sessions.map(\.name))
-        let s = Session(name: name, directory: directory, status: .paused)
+        let groupId = group(groupId)?.id
+        // First session in a folder (not a blank one in ~, not one already put in a group):
+        // offer to start a group for it.
+        let firstInFolder = groupId == nil && directory != NSHomeDirectory() && sessionCount(inFolder: directory) == 0
+        let s = Session(name: name, directory: directory, groupId: groupId,
+                        order: GroupOps.nextOrder(in: groupId, sessions: sessions), status: .paused)
         sessions.append(s)
         query = ""
+        if let groupId { setCollapsed(groupId, false) }
         select(s.id, focusTerminal: true)
         persist()
+        if firstInFolder {
+            groupSheet = GroupSheetRequest(mode: .newFolder, sessionId: s.id, suggestedName: SessionNaming.defaultName(for: directory))
+        }
     }
 
     /// Selecting is "opening": a Paused session resumes (S-5).
     func select(_ id: UUID, focusTerminal: Bool = true) {
         guard session(id) != nil else { return }
         if renamingId != nil && renamingId != id { renamingId = nil }
+        reveal(id)
         selectedId = id
         open(id)
         if NSApp.isActive { markRead(id) }
@@ -247,15 +297,26 @@ final class SessionStore: ObservableObject {
     /// S-8: terminates the process and removes it; Claude's transcript on disk is untouched.
     func delete(_ id: UUID) {
         confirmDeleteId = nil
-        if renamingId == id { renamingId = nil }
-        terminals.remove(id)
-        notifier.clear(sessionId: id)
+        delete(Set([id]))
+    }
+
+    /// Removes several sessions in one pass (Delete group and its sessions). The selection moves
+    /// once, to the nearest visible session that is not being deleted, so no session that is
+    /// about to go away gets selected (and launched) on the way.
+    private func delete(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        if let r = renamingId, ids.contains(r) { renamingId = nil }
+        for id in ids {
+            terminals.remove(id)
+            notifier.clear(sessionId: id)
+        }
         let visible = visibleIds
-        sessions.removeAll { $0.id == id }
-        if selectedId == id {
-            let idx = visible.firstIndex(of: id) ?? 0
-            let remaining = visible.filter { $0 != id && session($0) != nil }
-            selectedId = remaining.isEmpty ? sessions.first?.id : remaining[min(idx, remaining.count - 1)]
+        sessions.removeAll { ids.contains($0.id) }
+        if let sel = selectedId, ids.contains(sel) {
+            let idx = visible.firstIndex(of: sel) ?? 0
+            let before = visible[..<min(idx, visible.count)].reversed().filter { session($0) != nil }
+            let after = visible[min(idx, visible.count)...].filter { session($0) != nil }
+            selectedId = after.first ?? before.first ?? sessions.first { !$0.isArchived }?.id ?? sessions.first?.id
             if let next = selectedId { select(next) }
         }
         persist()
@@ -279,10 +340,25 @@ final class SessionStore: ObservableObject {
             return
         }
         guard let id = id ?? selectedId, let s = session(id) else { return }
-        if s.isArchived { archivedOpen = true }
+        // A search that hides the row is cleared first, then its group / Archived is opened.
         if !query.isEmpty && !SidebarLayout.matches(s, query: query) { query = "" }
+        reveal(id)
         if selectedId != id { select(id, focusTerminal: false) }
         renamingId = id
+    }
+
+    /// Expands what hides a session's row (its collapsed group, the closed Archived section),
+    /// e.g. when the quick switcher or a notification selects it. Also while a search is shown,
+    /// so the row is still visible once the search is cleared.
+    private func reveal(_ id: UUID) {
+        guard let s = session(id) else { return }
+        if s.isArchived {
+            if !archivedOpen { archivedOpen = true }
+        } else if let g = group(s.groupId) {
+            if g.isCollapsed { setCollapsed(g.id, false) }
+        } else if !ungroupedOpen {
+            ungroupedOpen = true
+        }
     }
 
     /// Returns false when the name is rejected (empty).
@@ -304,6 +380,147 @@ final class SessionStore: ObservableObject {
     func showError(_ title: String, _ message: String) {
         errorTitle = title
         errorMessage = message
+    }
+
+    // MARK: Groups
+
+    func toggleCollapsed(_ id: UUID) {
+        guard let g = group(id) else { return }
+        setCollapsed(id, !g.isCollapsed)
+    }
+
+    private func setCollapsed(_ id: UUID, _ collapsed: Bool) {
+        guard let i = groups.firstIndex(where: { $0.id == id }), groups[i].isCollapsed != collapsed else { return }
+        groups[i].isCollapsed = collapsed
+        persist()
+    }
+
+    /// Sidebar "New group…" (no Move option) or the session header's group chip (with Move).
+    func showGroupSheet(movingSession sessionId: UUID? = nil) {
+        showQuickSwitcher = false
+        showNewSession = false
+        groupSheet = GroupSheetRequest(mode: sessionId == nil ? .scratch : .fromSession, sessionId: sessionId, suggestedName: "")
+    }
+
+    func closeGroupSheet() {
+        groupSheet = nil
+        terminalFocusRequest += 1
+    }
+
+    /// Creates the group from the sheet and moves the session into it when asked.
+    /// Returns false when the name is empty or taken.
+    @discardableResult
+    func createGroup(name: String, color: GroupColor, moving sessionId: UUID?) -> Bool {
+        guard case .valid(let valid) = GroupNaming.validate(name, groups: groups) else { return false }
+        let g = GroupOps.create(name: valid, color: color, groups: &groups)
+        if let sessionId, session(sessionId) != nil {
+            GroupOps.move(sessionId, to: g.id, sessions: &sessions)
+        }
+        groupSheet = nil
+        persist()
+        terminalFocusRequest += 1
+        return true
+    }
+
+    func beginRenameGroup(_ id: UUID) {
+        guard group(id) != nil else { return }
+        renamingId = nil
+        query = ""
+        renamingGroupId = id
+    }
+
+    /// Returns false when the name is empty or used by another group (it is not saved).
+    @discardableResult
+    func commitRenameGroup(_ id: UUID, to name: String) -> Bool {
+        guard case .valid(let valid) = GroupNaming.validate(name, groups: groups, excluding: id),
+              let i = groups.firstIndex(where: { $0.id == id }) else { return false }
+        groups[i].name = valid
+        renamingGroupId = nil
+        persist()
+        terminalFocusRequest += 1
+        return true
+    }
+
+    func cancelRenameGroup() {
+        renamingGroupId = nil
+        terminalFocusRequest += 1
+    }
+
+    func setGroupColor(_ id: UUID, _ color: GroupColor) {
+        guard let i = groups.firstIndex(where: { $0.id == id }) else { return }
+        groups[i].color = color
+        persist()
+    }
+
+    func requestDeleteGroup(_ id: UUID) {
+        guard group(id) != nil else { return }
+        confirmDeleteGroupId = id
+    }
+
+    /// Sessions the Delete group dialog talks about (archived ones included).
+    func sessionCount(inGroup id: UUID) -> Int {
+        sessions.filter { $0.groupId == id }.count
+    }
+
+    /// Deletes the group. Its sessions move to Ungrouped, or are deleted too (their claude
+    /// processes are stopped; Claude's transcripts on disk are untouched).
+    func deleteGroup(_ id: UUID, deleteSessions: Bool) {
+        confirmDeleteGroupId = nil
+        guard group(id) != nil else { return }
+        if renamingGroupId == id { renamingGroupId = nil }
+        if deleteSessions {
+            delete(Set(GroupOps.allMembers(of: id, in: sessions).map(\.id)))
+        } else {
+            GroupOps.ungroupAll(id, sessions: &sessions)
+        }
+        groups.removeAll { $0.id == id }
+        persist()
+    }
+
+    /// Drag and drop: into a group (nil = Ungrouped), before a row or at the end.
+    /// An archived session dropped here is unarchived.
+    func moveSession(_ id: UUID, toGroup groupId: UUID?, before: UUID? = nil) {
+        guard session(id) != nil, groupId == nil || group(groupId) != nil else { return }
+        GroupOps.move(id, to: groupId, before: before, sessions: &sessions)
+        persist()
+    }
+
+    /// Drag and drop onto Archived.
+    func archive(_ id: UUID) {
+        guard session(id)?.isArchived == false else { return }
+        toggleArchive(id)
+    }
+
+    /// Drag a group heading: before another group (nil = last, above Ungrouped).
+    func moveGroup(_ id: UUID, before: UUID?) {
+        GroupOps.moveGroup(id, before: before, groups: &groups)
+        persist()
+    }
+
+    /// A drag starting on a session row or group heading. Ignored (no drop will accept it) while
+    /// that item is being renamed or a search is shown.
+    func beginSidebarDrag(_ drag: SidebarDragItem) {
+        dropMark = nil
+        switch drag {
+        case .session(let id) where renamingId == id: sidebarDrag = nil
+        case .group(let id) where renamingGroupId == id: sidebarDrag = nil
+        default: sidebarDrag = query.isEmpty ? drag : nil
+        }
+    }
+
+    /// A drag cancelled with Esc or dropped outside the sidebar never reaches performDrop, so
+    /// its state is cleared on the next click.
+    private func clearStaleSidebarDrag() {
+        if sidebarDrag != nil { sidebarDrag = nil }
+        if dropMark != nil { dropMark = nil }
+    }
+
+    func perform(_ action: SidebarDropAction) {
+        switch action {
+        case .moveSession(let id, let groupId, let before): moveSession(id, toGroup: groupId, before: before)
+        case .archive(let id): archive(id)
+        case .moveGroup(let id, let before): moveGroup(id, before: before)
+        }
     }
 
     // MARK: Export
@@ -446,7 +663,8 @@ final class SessionStore: ObservableObject {
     }
 
     private func persist() {
-        let state = PersistedState(sessions: sessions, selectedId: selectedId, archivedOpen: archivedOpen)
+        let state = PersistedState(sessions: sessions, groups: groups, selectedId: selectedId, archivedOpen: archivedOpen,
+                                   ungroupedOpen: ungroupedOpen)
         do { try state.save(to: paths.sessionsFile) } catch {
             NSLog("Bubblegum: could not save sessions: \(error)")
         }
@@ -464,4 +682,21 @@ final class SessionStore: ObservableObject {
         watcher?.stop()
         terminals.terminateAll()
     }
+}
+
+/// What the Create group sheet was opened for.
+struct GroupSheetRequest: Identifiable, Equatable {
+    enum Mode: Equatable {
+        /// Sidebar "New group…": no Move option.
+        case scratch
+        /// The session header's group chip: "Move <session> into this group", on by default.
+        case fromSession
+        /// Opened after the first session in a folder was created; Cancel keeps it in Ungrouped.
+        case newFolder
+    }
+
+    let id = UUID()
+    var mode: Mode
+    var sessionId: UUID?
+    var suggestedName: String
 }

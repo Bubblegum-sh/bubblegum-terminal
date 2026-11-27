@@ -31,6 +31,7 @@ struct SidebarView: View {
                         LazyVStack(alignment: .leading, spacing: 2) {
                             ForEach(store.sidebarItems) { item in
                                 itemView(item, now: context.date)
+                                    .modifier(SidebarDragDrop(item: item, drag: dragItem(item)))
                             }
                         }
                     }
@@ -42,6 +43,7 @@ struct SidebarView: View {
                 .onAppear { reveal(store.selectedId, proxy, animated: false) }
                 .onChange(of: store.selectedId) { _, id in reveal(id, proxy, animated: true) }
                 .onChange(of: store.archivedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
+                .onChange(of: store.ungroupedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
             }
 
             footer
@@ -130,6 +132,15 @@ struct SidebarView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
                 .padding(.horizontal, 8)
+        case .group(let id, let count, let isOpen, let attention):
+            if let g = store.group(id) {
+                GroupHeader(group: g, count: count, isOpen: isOpen, needsAttention: attention,
+                            isRenaming: store.renamingGroupId == id)
+            }
+        case .ungrouped(let count, let isOpen, let attention):
+            UngroupedHeader(count: count, isOpen: isOpen, needsAttention: attention)
+        case .newGroup:
+            NewGroupButton()
         case .archivedToggle(let count, let isOpen):
             Button {
                 store.archivedOpen.toggle()
@@ -155,9 +166,21 @@ struct SidebarView: View {
                     session: s,
                     isSelected: store.selectedId == id,
                     isRenaming: store.renamingId == id,
-                    now: now
+                    now: now,
+                    // Rows under their own heading don't repeat the group.
+                    groupTag: (s.isArchived || !store.query.isEmpty) ? store.group(s.groupId) : nil
                 )
             }
+        }
+    }
+
+    /// Session rows and group headings can be dragged (the store ignores a drag that starts
+    /// while renaming that item or searching).
+    private func dragItem(_ item: SidebarItem) -> SidebarDragItem? {
+        switch item {
+        case .row(let id): return .session(id)
+        case .group(let id, _, _, _): return .group(id)
+        default: return nil
         }
     }
 

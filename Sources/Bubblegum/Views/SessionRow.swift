@@ -1,57 +1,97 @@
 import SwiftUI
 import BubblegumCore
 
-/// One sidebar row (L-2, L-3): status dot, name, subtitle, and time/unread or inline actions.
+/// One sidebar row (L-2, L-3): status dot, name, subtitle, and time/unread.
+/// Hovering (or tabbing to it) swaps the time/unread for a "…" menu with the row's actions.
 struct SessionRow: View {
     let session: Session
     let isSelected: Bool
     let isRenaming: Bool
     let now: Date
+    /// Shown as a small colour square after the name where rows are not under their
+    /// group heading (search results, Archived).
+    var groupTag: SessionGroup? = nil
 
     @EnvironmentObject private var store: SessionStore
     @Environment(\.theme) private var theme
     @State private var hover = false
+    @FocusState private var menuFocused: Bool
+    @FocusState private var rowFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             if isRenaming {
                 renameField
             } else {
-                Button {
-                    store.select(session.id)
-                } label: {
-                    content
-                }
-                .buttonStyle(.plain)
-                .simultaneousGesture(TapGesture(count: 2).onEnded { store.beginRename(session.id) })
-                .accessibilityLabel(accessibilityText)
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                // A tap gesture, not a Button: on macOS a Button keeps the mouse press to itself,
+                // so the sidebar's drag (onDrag on this row) would never start.
+                // Focusable like a button: Tab reaches it (per the system's keyboard navigation
+                // setting), Return or Space opens the session.
+                content
+                    .onTapGesture { store.select(session.id) }
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { store.beginRename(session.id) })
+                    .focusable(interactions: .activate)
+                    .focused($rowFocused)
+                    .focusEffectDisabled()
+                    .onKeyPress(keys: [.return, .space]) { _ in store.select(session.id); return .handled }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilityText)
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityAction { store.select(session.id) }
             }
 
-            if isSelected && !isRenaming {
-                actions
-            } else if !isRenaming {
+            if !isRenaming {
                 meta
+                    .opacity(showsMenu ? 0 : 1)
+                    .overlay(alignment: .trailing) { menuButton }
             }
         }
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected ? theme.selectedRowC : (hover ? theme.elevatedC.opacity(0.5) : .clear))
         )
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.accentC, lineWidth: 2).opacity(rowFocused ? 1 : 0))
         .opacity(session.isArchived ? 0.72 : 1)
         .onHover { hover = $0 }
-        .contextMenu { contextMenu }
+        .contextMenu { SessionMenuItems(session: session) }
+    }
+
+    private var showsMenu: Bool { hover || menuFocused }
+
+    /// Same spot as a group heading's "…": 3 + 22/2 = 14 pt from the edge, over the unread dot.
+    private var menuButton: some View {
+        Menu {
+            SessionMenuItems(session: session)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.text2)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 22, height: 22)
+        .focused($menuFocused)
+        .opacity(showsMenu ? 1 : 0)
+        .padding(.trailing, 3)
+        .help("\(session.name) actions")
+        .accessibilityLabel("\(session.name) actions")
     }
 
     private var content: some View {
         HStack(spacing: 10) {
             StatusDot(status: session.status)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.name)
-                    .font(TFFont.rowName)
-                    .foregroundStyle(theme.text1)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 5) {
+                    Text(session.name)
+                        .font(TFFont.rowName)
+                        .foregroundStyle(theme.text1)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if let g = groupTag {
+                        GroupSwatch(color: g.color, size: 7).help(GroupNaming.title(g.name))
+                    }
+                }
                 Text(session.subtitle)
                     .font(TFFont.subtitle)
                     .foregroundStyle(theme.text2)
@@ -80,21 +120,6 @@ struct SessionRow: View {
         .allowsHitTesting(false)
     }
 
-    private var actions: some View {
-        HStack(spacing: 2) {
-            if session.isArchived {
-                IconButton(systemImage: "tray.and.arrow.up", label: "Unarchive (⇧⌘A)") {
-                    store.toggleArchive(session.id)
-                }
-            } else {
-                IconButton(systemImage: "archivebox", label: "Archive (⇧⌘A)") {
-                    store.toggleArchive(session.id)
-                }
-            }
-        }
-        .padding(.trailing, 6)
-    }
-
     // MARK: Rename (L-5)
 
     private var renameField: some View {
@@ -115,38 +140,21 @@ struct SessionRow: View {
         .padding(.horizontal, 10)
     }
 
-    // MARK: Context menu (L-7)
-
-    @ViewBuilder
-    private var contextMenu: some View {
-        if session.isArchived {
-            Button("Unarchive") { store.toggleArchive(session.id) }
-            Button("Rename…") { store.beginRename(session.id) }
-            Button("Export…") { store.exportSession(session.id) }
-            Divider()
-            Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
-        } else {
-            Button("Rename…") { store.beginRename(session.id) }
-            Button("Archive") { store.toggleArchive(session.id) }
-            Divider()
-            Button("Restart Session") { store.requestRestart(session.id) }
-            Button("Export…") { store.exportSession(session.id) }
-            Divider()
-            Button("Delete Session…", role: .destructive) { store.requestDelete(session.id) }
-        }
-    }
-
     private var accessibilityText: String {
         var parts = [session.name, session.status.label, session.subtitle]
+        if let g = groupTag { parts.append(GroupNaming.title(g.name)) }
         if session.unread { parts.append("unread") }
         return parts.joined(separator: ", ")
     }
 }
 
-/// Inline text field: Enter saves, Esc cancels, empty name is rejected.
-/// Clicking outside the field (or moving focus away) saves; an empty name is reverted.
-private struct RenameField: View {
+/// Inline text field: Enter saves, Esc cancels, an invalid name is rejected.
+/// Clicking outside the field (or moving focus away) saves; an invalid name is reverted.
+/// Used for session rows and group headings.
+struct RenameField: View {
     let initial: String
+    var label = "Session name"
+    var font = TFFont.rowName
     let onCommit: (String) -> Bool
     let onCancel: () -> Void
 
@@ -158,16 +166,16 @@ private struct RenameField: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        TextField("Session name", text: $text)
+        TextField(label, text: $text)
             .textFieldStyle(.plain)
-            .font(TFFont.rowName)
+            .font(font)
             .foregroundStyle(theme.text1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(RoundedRectangle(cornerRadius: 5).fill(theme.terminalC))
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(rejected ? Color.red : theme.accentC, lineWidth: 1))
             .focused($focused)
-            .accessibilityLabel("Session name")
+            .accessibilityLabel(label)
             .onAppear {
                 text = initial
                 DispatchQueue.main.async { focused = true }
@@ -226,5 +234,27 @@ private struct RenameField: View {
         else { return false }
         return hit === editor || hit.isDescendant(of: editor)
             || (editor.delegate as? NSView).map { hit === $0 || hit.isDescendant(of: $0) } ?? false
+    }
+}
+
+/// A session's actions (L-7): the row's "…" menu and its right-click menu.
+struct SessionMenuItems: View {
+    let session: Session
+    @EnvironmentObject private var store: SessionStore
+
+    var body: some View {
+        if session.isArchived {
+            Button { store.toggleArchive(session.id) } label: { Label("Unarchive", systemImage: "tray.and.arrow.up") }
+            Button { store.beginRename(session.id) } label: { Label("Rename…", systemImage: "pencil") }
+            Button { store.exportSession(session.id) } label: { Label("Export…", systemImage: "square.and.arrow.up") }
+        } else {
+            Button { store.beginRename(session.id) } label: { Label("Rename…", systemImage: "pencil") }
+            Button { store.toggleArchive(session.id) } label: { Label("Archive", systemImage: "archivebox") }
+            Divider()
+            Button { store.requestRestart(session.id) } label: { Label("Restart Session", systemImage: "arrow.clockwise") }
+            Button { store.exportSession(session.id) } label: { Label("Export…", systemImage: "square.and.arrow.up") }
+        }
+        Divider()
+        Button(role: .destructive) { store.requestDelete(session.id) } label: { Label("Delete Session…", systemImage: "trash") }
     }
 }

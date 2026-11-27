@@ -208,9 +208,9 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 
     @Test func groups() {
         let items = SidebarLayout.items(sessions: [a, b, c, d], query: "", archivedOpen: true)
-        #expect(items == [.label("Sessions · 3"), .row(a.id), .row(b.id), .row(c.id), .archivedToggle(count: 1, isOpen: true), .row(d.id)])
+        #expect(items == [.ungrouped(count: 3), .row(a.id), .row(b.id), .row(c.id), .newGroup, .archivedToggle(count: 1, isOpen: true), .row(d.id)])
         let closed = SidebarLayout.items(sessions: [b], query: "", archivedOpen: false)
-        #expect(closed == [.label("Sessions · 1"), .row(b.id)])
+        #expect(closed == [.ungrouped(count: 1), .row(b.id), .newGroup, .archivedToggle(count: 0, isOpen: false)])
     }
 
     @Test func searchIncludesArchived() {
@@ -297,7 +297,7 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
         try Data(legacy.utf8).write(to: url)
         let loaded = try #require(PersistedState.load(from: url))
         #expect(loaded.sessions.map(\.id) == [id])
-        #expect(SidebarLayout.items(sessions: loaded.sessions, query: "", archivedOpen: true) == [.label("Sessions · 1"), .row(id)])
+        #expect(SidebarLayout.items(sessions: loaded.sessions, query: "", archivedOpen: true) == [.ungrouped(count: 1), .row(id), .newGroup, .archivedToggle(count: 0, isOpen: true)])
     }
 
     @Test func toleratesMissingFieldsAndSkipsBadSessions() throws {
@@ -358,8 +358,8 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
     @Test func groupsKeepCreationOrderAndCounts() {
         #expect(active.count == 300 && archived.count == 200)
         let items = SidebarLayout.items(sessions: sessions, query: "", archivedOpen: true)
-        let expected: [SidebarItem] = [.label("Sessions · 300")] + active.map { .row($0.id) }
-            + [.archivedToggle(count: 200, isOpen: true)] + archived.map { .row($0.id) }
+        let expected: [SidebarItem] = [.ungrouped(count: 300)] + active.map { .row($0.id) }
+            + [.newGroup, .archivedToggle(count: 200, isOpen: true)] + archived.map { .row($0.id) }
         #expect(items == expected)
         // ⌘1…⌘9 / next / previous walk active first, then archived.
         #expect(SidebarLayout.visibleIds(items) == active.map(\.id) + archived.map(\.id))
@@ -367,15 +367,18 @@ private func readJSON(_ url: URL) throws -> [String: Any] {
 
     @Test func collapsedArchiveHidesOnlyArchivedRows() {
         let items = SidebarLayout.items(sessions: sessions, query: "", archivedOpen: false)
-        #expect(items.count == 1 + 300 + 1)
+        #expect(items.count == 1 + 300 + 1 + 1)
         #expect(items.last == .archivedToggle(count: 200, isOpen: false))
         #expect(SidebarLayout.visibleIds(items) == active.map(\.id))
         #expect(Set(items.map(\.id)).count == items.count) // ids unique for ForEach
     }
 
-    @Test func noArchivedSessionsMeansNoToggle() {
+    @Test func ungroupedAndArchivedShowEvenWhenEmpty() {
+        // Both stay visible as drop targets (drag onto Ungrouped / Archived).
+        #expect(SidebarLayout.items(sessions: [], query: "", archivedOpen: true)
+                == [.ungrouped(count: 0), .newGroup, .archivedToggle(count: 0, isOpen: true)])
         let items = SidebarLayout.items(sessions: active, query: "", archivedOpen: true)
-        #expect(!items.contains { if case .archivedToggle = $0 { return true } else { return false } })
+        #expect(items.last == .archivedToggle(count: 0, isOpen: true))
     }
 
     @Test func searchSpansBothGroupsInCreationOrder() {

@@ -24,6 +24,15 @@ struct ContentView: View {
                 NewSessionView()
                     .transition(.opacity)
             }
+            if let request = store.groupSheet {
+                GroupSheetView(request: request)
+                    .id(request.id)
+                    .transition(.opacity)
+            }
+            if let g = store.group(store.confirmDeleteGroupId) {
+                GroupDeleteDialog(group: g)
+                    .transition(.opacity)
+            }
         }
         .background(theme.windowC)
         .background(WindowChrome())

@@ -30,6 +30,18 @@ enum DebugSnapshot {
                 case "first": if let id = store.visibleIds.first { store.select(id, focusTerminal: false) }
                 case "last": if let id = store.visibleIds.last { store.select(id, focusTerminal: false) }
                 case "togglearchived": store.archivedOpen.toggle()
+                case "toggleungrouped": store.ungroupedOpen.toggle()
+                case "collapsegroup": if let g = store.sortedGroups.first { store.toggleCollapsed(g.id) }
+                case "newingroup": store.showNewSessionSheet(inGroup: store.sortedGroups.first?.id)
+                case "newgroup": store.showGroupSheet()
+                case "groupfromsession": store.showGroupSheet(movingSession: store.selectedId)
+                case "takenname": store.groupSheet = GroupSheetRequest(mode: .fromSession, sessionId: store.selectedId, suggestedName: "work")
+                case "newfolder":
+                    if let s = store.selected {
+                        store.groupSheet = GroupSheetRequest(mode: .newFolder, sessionId: s.id, suggestedName: SessionNaming.defaultName(for: s.directory))
+                    }
+                case "deletegroup": if let g = store.sortedGroups.first { store.requestDeleteGroup(g.id) }
+                case "renamegroup": if let g = store.sortedGroups.first { store.beginRenameGroup(g.id) }
                 case "colors":
                     let c = NSColor.controlAccentColor.usingColorSpace(.sRGB)!
                     let h = NSColor.selectedContentBackgroundColor.usingColorSpace(.sRGB)!

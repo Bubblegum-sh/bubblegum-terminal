@@ -72,9 +72,15 @@ struct SessionDetailView: View {
         HStack(spacing: 10) {
             if let s = store.selected {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(s.name)
-                        .font(TFFont.toolbarTitle)
-                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text(s.name)
+                            .font(TFFont.toolbarTitle)
+                            .lineLimit(1)
+                        // The session's group, right after its name (archived sessions too).
+                        if let g = store.group(s.groupId) {
+                            GroupChip(group: g, sessionId: s.id)
+                        }
+                    }
                     Text(pathLine(s))
                         .font(TFFont.path)
                         .foregroundStyle(theme.text2)
@@ -84,7 +90,6 @@ struct SessionDetailView: View {
                 .layoutPriority(1)
                 WindowDragArea().frame(maxWidth: .infinity)
                 BranchPill(git: store.git, isOpen: $branchOpen)
-                StatusPill(session: s)
                 if let info = s.modelInfo {
                     ModelPill(info: info)
                 }
@@ -117,27 +122,6 @@ struct SessionDetailView: View {
     }
 }
 
-struct StatusPill: View {
-    let session: Session
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        let label = session.isArchived ? "Archived" : session.status.label
-        HStack(spacing: 6) {
-            Circle().fill(theme.statusC(session.status)).frame(width: 7, height: 7)
-            Text(label).font(.system(size: 11, weight: .medium)).lineLimit(1)
-        }
-        .fixedSize()
-        .padding(.vertical, 4)
-        .padding(.leading, 8)
-        .padding(.trailing, 10)
-        .background(Capsule().fill(theme.elevatedC))
-        .help(session.status.label)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Status: \(label)")
-    }
-}
-
 /// Model and reasoning effort from the session's last answer (read from its transcript).
 struct ModelPill: View {
     let info: ModelInfo
@@ -156,7 +140,7 @@ struct ModelPill: View {
             if let level = info.effortLevel, let label = info.effortLabel {
                 Rectangle().fill(theme.borderC).frame(width: 1, height: 12)
                 EffortBars(level: level)
-                Text("\(label) effort")
+                Text(label)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.text2)
                     .lineLimit(1)
