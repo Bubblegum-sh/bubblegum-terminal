@@ -51,11 +51,11 @@ final class TerminalController: NSObject, LocalProcessTerminalViewDelegate {
         view.optionAsMetaKey = true
     }
 
-    func start(directory: String, resumeId: String?) {
+    func start(directory: String, resumeId: String?, newSessionId: String?) {
         let shell = LaunchCommand.shell()
         view.startProcess(
             executable: shell,
-            args: LaunchCommand.arguments(directory: directory, resumeId: resumeId),
+            args: LaunchCommand.arguments(directory: directory, resumeId: resumeId, newSessionId: newSessionId),
             environment: LaunchCommand.environment(sessionId: sessionId),
             execName: nil,
             currentDirectory: FileManager.default.fileExists(atPath: directory) ? directory : NSHomeDirectory()
@@ -108,14 +108,16 @@ final class TerminalRegistry {
         return !c.exited
     }
 
-    /// Starts a fresh process for the session, replacing any previous terminal.
+    /// Starts a fresh process for the session, replacing any previous terminal. With `resume`,
+    /// `claude --resume <claudeSessionId>`; otherwise `claude --session-id <claudeSessionId>`.
     func start(_ session: Session, resume: Bool) {
         remove(session.id)
         let c = TerminalController(sessionId: session.id)
         c.registry = self
         style(c.view)
         controllers[session.id] = c
-        c.start(directory: session.directory, resumeId: resume ? session.claudeSessionId : nil)
+        c.start(directory: session.directory, resumeId: resume ? session.claudeSessionId : nil,
+                newSessionId: resume ? nil : session.claudeSessionId)
     }
 
     /// Terminates the process and drops the view.

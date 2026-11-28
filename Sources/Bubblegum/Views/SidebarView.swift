@@ -42,6 +42,7 @@ struct SidebarView: View {
                 // switcher and notification clicks can select a row that is scrolled away.
                 .onAppear { reveal(store.selectedId, proxy, animated: false) }
                 .onChange(of: store.selectedId) { _, id in reveal(id, proxy, animated: true) }
+                .onChange(of: store.infoSessionId) { _, id in reveal(id, proxy, animated: true) }
                 .onChange(of: store.archivedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
                 .onChange(of: store.ungroupedOpen) { _, _ in reveal(store.selectedId, proxy, animated: true) }
             }
@@ -70,7 +71,7 @@ struct SidebarView: View {
                 proxy.scrollTo(key)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.25 : 0.05)) {
-                guard store.selectedId == id else { return }
+                guard store.selectedId == id || store.infoSessionId == id else { return }
                 proxy.scrollTo(key)
             }
         }

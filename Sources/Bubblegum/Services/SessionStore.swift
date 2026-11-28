@@ -11,7 +11,12 @@ final class SessionStore: ObservableObject {
         didSet { updateBadge() }
     }
     @Published private(set) var selectedId: UUID? {
-        didSet { if selectedId != oldValue { git.track(selected?.directory) } }
+        didSet {
+            guard selectedId != oldValue else { return }
+            git.track(selected?.directory)
+            // Session Info closes when another session is selected.
+            if infoSessionId != nil && infoSessionId != selectedId { infoSessionId = nil }
+        }
     }
     @Published private(set) var groups: [SessionGroup] = []
     @Published var query: String = ""
@@ -35,6 +40,8 @@ final class SessionStore: ObservableObject {
     @Published var errorTitle = "Something went wrong"
     @Published var confirmRestartId: UUID?
     @Published var confirmDeleteId: UUID?
+    /// The session whose Session Info popover is open.
+    @Published private(set) var infoSessionId: UUID?
     /// Group heading being renamed inline.
     @Published var renamingGroupId: UUID?
     /// Group waiting for the Delete group confirmation.
@@ -257,7 +264,10 @@ final class SessionStore: ObservableObject {
         // Only resume a conversation Claude Code actually saved; a session that never got a
         // message has an id but no transcript, and `claude --resume` would fail on it.
         let resume = requested && (s.claudeSessionId.map { ClaudeTranscripts.exists(sessionId: $0) } ?? false)
-        if !resume { s.claudeSessionId = nil }
+        // A new conversation gets its id up front (`claude --session-id`), so its transcript
+        // can be found before any hook reports in.
+        if !resume { s.claudeSessionId = UUID().uuidString.lowercased() }
+        let claudeId = s.claudeSessionId
         terminals.start(s, resume: resume)
         // Every project session start updates recents (blank sessions in ~ are skipped).
         recents.record(path: s.directory)
@@ -267,7 +277,7 @@ final class SessionStore: ObservableObject {
             $0.claudeNotFound = false
             $0.terminalTitle = nil
             $0.lastMessage = nil
-            if !resume { $0.claudeSessionId = nil; $0.modelInfo = nil }
+            if !resume { $0.claudeSessionId = claudeId; $0.modelInfo = nil }
         }
         if id == selectedId { terminalFocusRequest += 1 }
     }
@@ -308,6 +318,7 @@ final class SessionStore: ObservableObject {
     private func delete(_ ids: Set<UUID>) {
         guard !ids.isEmpty else { return }
         if let r = renamingId, ids.contains(r) { renamingId = nil }
+        if let i = infoSessionId, ids.contains(i) { infoSessionId = nil }
         for id in ids {
             terminals.remove(id)
             notifier.clear(sessionId: id)
@@ -383,6 +394,28 @@ final class SessionStore: ObservableObject {
 
     func cancelRename() {
         renamingId = nil
+        terminalFocusRequest += 1
+    }
+
+    // MARK: Session Info
+
+    /// The session menu or Session › Session Info: opens Session Info for the session (the selected one by
+    /// default), anchored to its row; asking again for the same session closes it.
+    func toggleSessionInfo(_ id: UUID? = nil) {
+        guard let id = id ?? selectedId, session(id) != nil else { return }
+        if infoSessionId == id { closeSessionInfo(); return }
+        showQuickSwitcher = false
+        showNewSession = false
+        if renamingId != nil { renamingId = nil }
+        // Its row has to be on screen for the popover to point at it.
+        if let s = session(id), !query.isEmpty && !SidebarLayout.matches(s, query: query) { query = "" }
+        reveal(id)
+        infoSessionId = id
+    }
+
+    func closeSessionInfo() {
+        guard infoSessionId != nil else { return }
+        infoSessionId = nil
         terminalFocusRequest += 1
     }
 

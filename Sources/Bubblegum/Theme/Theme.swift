@@ -73,12 +73,20 @@ struct Theme: Equatable {
 
     /// Text and icons on destructive actions (Delete group).
     var danger: NSColor { isDark ? .hex(0xFF6B6B) : .hex(0xC62828) }
+    /// Popovers over the terminal area (Session Info).
+    var popover: NSColor { isDark ? .hex(0x232228) : .hex(0xFFFFFF) }
+    var popoverBorder: NSColor { isDark ? .hex(0x3E3D45) : .hex(0xD6D3DB) }
+    /// Input tokens in Session Info (output uses the accent).
+    var tokenInput: NSColor { isDark ? .hex(0x6FA8FF) : .hex(0x2F6FE0) }
     /// Inline validation messages ("A group with this name already exists").
     var warning: NSColor { isDark ? .hex(0xFF9F43) : .hex(0xB05A00) }
 
     // SwiftUI accessors
     func groupC(_ c: GroupColor) -> Color { Color(nsColor: groupColor(c)) }
     var dangerC: Color { Color(nsColor: danger) }
+    var popoverC: Color { Color(nsColor: popover) }
+    var popoverBorderC: Color { Color(nsColor: popoverBorder) }
+    var tokenInputC: Color { Color(nsColor: tokenInput) }
     var warningC: Color { Color(nsColor: warning) }
     var windowC: Color { Color(nsColor: window) }
     var sidebarC: Color { Color(nsColor: sidebar) }

@@ -31,6 +31,8 @@ struct AppCommands: Commands {
             Button("Rename…") { store.beginRename() }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(s == nil)
+            Button("Session Info") { store.toggleSessionInfo() }
+                .disabled(s == nil)
             Button(s?.isArchived == true ? "Unarchive" : "Archive") { store.toggleArchive() }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(s == nil)
