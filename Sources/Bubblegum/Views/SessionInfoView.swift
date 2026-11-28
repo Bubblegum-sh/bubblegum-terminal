@@ -162,7 +162,8 @@ struct SessionInfoPopover: View {
             HStack(spacing: 6) {
                 if let g = store.group(session.groupId) {
                     chip {
-                        Circle().fill(theme.groupC(g.color)).frame(width: 7, height: 7)
+                        // Rounded square like the sidebar and header, not a status-like dot.
+                        GroupSwatch(color: g.color, size: 8)
                         Text(g.name)
                     }
                     .accessibilityElement(children: .ignore)
