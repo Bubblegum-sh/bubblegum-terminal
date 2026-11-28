@@ -177,7 +177,7 @@ struct ModelPill: View {
 }
 
 /// Five rising bars; the first `level` are filled in accent.
-private struct EffortBars: View {
+struct EffortBars: View {
     let level: Int
     @Environment(\.theme) private var theme
 

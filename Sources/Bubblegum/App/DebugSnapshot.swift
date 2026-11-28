@@ -22,6 +22,7 @@ enum DebugSnapshot {
                 case "search": store.query = "pa"
                 case "clear": store.query = ""; store.showQuickSwitcher = false
                 case "rename": store.beginRename()
+                case "info": store.toggleSessionInfo()
                 case "newsession": store.showNewSessionSheet()
                 case "down": store.newSessionIndex += 1
                 case "filter": store.newSessionFilter = "par"

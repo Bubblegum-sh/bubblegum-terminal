@@ -10,10 +10,16 @@ public enum LaunchCommand {
         "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    /// The `-c` script run by the login + interactive shell.
-    public static func script(directory: String, resumeId: String?) -> String {
+    /// The `-c` script run by the login + interactive shell. `resumeId` continues a saved
+    /// conversation; otherwise `newSessionId` (a UUID) names the new one, so its transcript is
+    /// `<session id>.jsonl` from the start.
+    public static func script(directory: String, resumeId: String?, newSessionId: String? = nil) -> String {
         var claude = "exec claude"
-        if let resumeId, !resumeId.isEmpty { claude += " --resume " + shellQuote(resumeId) }
+        if let resumeId, !resumeId.isEmpty {
+            claude += " --resume " + shellQuote(resumeId)
+        } else if let newSessionId, UUID(uuidString: newSessionId) != nil {
+            claude += " --session-id " + shellQuote(newSessionId)
+        }
         let notFound = "printf '\\r\\n\\033[1mclaude was not found in your PATH.\\033[0m\\r\\n"
             + "Install Claude Code, or check that ~/.zshrc (or ~/.zprofile) adds it to PATH.\\r\\n'; "
             + "exit \(claudeNotFoundExitCode)"
@@ -21,8 +27,8 @@ public enum LaunchCommand {
     }
 
     /// Arguments for `$SHELL`: login + interactive, so ~/.zprofile and ~/.zshrc apply.
-    public static func arguments(directory: String, resumeId: String?) -> [String] {
-        ["-l", "-i", "-c", script(directory: directory, resumeId: resumeId)]
+    public static func arguments(directory: String, resumeId: String?, newSessionId: String? = nil) -> [String] {
+        ["-l", "-i", "-c", script(directory: directory, resumeId: resumeId, newSessionId: newSessionId)]
     }
 
     /// The user's shell, falling back to zsh.

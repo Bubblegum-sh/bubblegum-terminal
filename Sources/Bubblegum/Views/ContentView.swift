@@ -3,6 +3,8 @@ import BubblegumCore
 
 /// Main window: fixed-width sidebar + detail, content under the (hidden) title bar.
 struct ContentView: View {
+    static let sidebarWidth: CGFloat = 268
+
     @EnvironmentObject private var store: SessionStore
     @EnvironmentObject private var settings: AppSettings
 
@@ -11,10 +13,16 @@ struct ContentView: View {
         ZStack {
             HStack(spacing: 0) {
                 SidebarView()
-                    .frame(width: 268)
+                    .frame(width: Self.sidebarWidth)
                 Rectangle().fill(theme.borderC).frame(width: 1)
                 SessionDetailView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .overlayPreferenceValue(SessionInfoAnchorKey.self) { anchor in
+                if let s = store.session(store.infoSessionId) {
+                    SessionInfoOverlay(session: s, anchor: anchor, contentLeading: Self.sidebarWidth + 1)
+                        .id(s.id)
+                }
             }
             if store.showQuickSwitcher {
                 QuickSwitcherView()

@@ -54,6 +54,7 @@ struct SessionRow: View {
         .opacity(session.isArchived ? 0.72 : 1)
         .onHover { hover = $0 }
         .contextMenu { SessionMenuItems(session: session) }
+        .anchorPreference(key: SessionInfoAnchorKey.self, value: .bounds) { store.infoSessionId == session.id ? $0 : nil }
     }
 
     private var showsMenu: Bool { hover || menuFocused }
@@ -246,9 +247,11 @@ struct SessionMenuItems: View {
         if session.isArchived {
             Button { store.toggleArchive(session.id) } label: { Label("Unarchive", systemImage: "tray.and.arrow.up") }
             Button { store.beginRename(session.id) } label: { Label("Rename…", systemImage: "pencil") }
+            sessionInfo
             Button { store.exportSession(session.id) } label: { Label("Export…", systemImage: "square.and.arrow.up") }
         } else {
             Button { store.beginRename(session.id) } label: { Label("Rename…", systemImage: "pencil") }
+            sessionInfo
             Button { store.toggleArchive(session.id) } label: { Label("Archive", systemImage: "archivebox") }
             Divider()
             Button { store.requestRestart(session.id) } label: { Label("Restart Session", systemImage: "arrow.clockwise") }
@@ -256,5 +259,11 @@ struct SessionMenuItems: View {
         }
         Divider()
         Button(role: .destructive) { store.requestDelete(session.id) } label: { Label("Delete Session…", systemImage: "trash") }
+    }
+
+    /// Shows ⌘I in the menu; the shortcut itself is the menu bar's Session › Session Info.
+    private var sessionInfo: some View {
+        Button { store.toggleSessionInfo(session.id) } label: { Label("Session Info", systemImage: "info.circle") }
+            .keyboardShortcut("i", modifiers: .command)
     }
 }
