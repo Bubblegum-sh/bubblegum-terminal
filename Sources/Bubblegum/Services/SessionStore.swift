@@ -20,6 +20,8 @@ final class SessionStore: ObservableObject {
 
     // UI state
     @Published var renamingId: UUID?
+    /// True when `renamingId` is being edited in the top bar rather than its sidebar row.
+    @Published private(set) var renamingInHeader = false
     @Published var showQuickSwitcher = false
     /// The New session sheet (⌘T) and its filter / focused row.
     @Published var showNewSession = false
@@ -332,7 +334,8 @@ final class SessionStore: ObservableObject {
         persist()
     }
 
-    func beginRename(_ id: UUID? = nil) {
+    /// `inHeader` edits the name in the top bar (double-click on the title) instead of the sidebar row.
+    func beginRename(_ id: UUID? = nil, inHeader: Bool = false) {
         if showQuickSwitcher, let h = quickSwitcherHighlight {
             showQuickSwitcher = false
             select(h, focusTerminal: false)
@@ -340,6 +343,12 @@ final class SessionStore: ObservableObject {
             return
         }
         guard let id = id ?? selectedId, let s = session(id) else { return }
+        renamingInHeader = inHeader
+        if inHeader {
+            if selectedId != id { select(id, focusTerminal: false) }
+            renamingId = id
+            return
+        }
         // A search that hides the row is cleared first, then its group / Archived is opened.
         if !query.isEmpty && !SidebarLayout.matches(s, query: query) { query = "" }
         reveal(id)

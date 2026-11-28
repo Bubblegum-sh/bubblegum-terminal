@@ -165,7 +165,7 @@ struct SidebarView: View {
                 SessionRow(
                     session: s,
                     isSelected: store.selectedId == id,
-                    isRenaming: store.renamingId == id,
+                    isRenaming: store.renamingId == id && !store.renamingInHeader,
                     now: now,
                     // Rows under their own heading don't repeat the group.
                     groupTag: (s.isArchived || !store.query.isEmpty) ? store.group(s.groupId) : nil

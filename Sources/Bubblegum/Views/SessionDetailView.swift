@@ -73,9 +73,23 @@ struct SessionDetailView: View {
             if let s = store.selected {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 8) {
-                        Text(s.name)
-                            .font(TFFont.toolbarTitle)
-                            .lineLimit(1)
+                        if store.renamingId == s.id && store.renamingInHeader {
+                            RenameField(initial: s.name, font: TFFont.toolbarTitle) { name in
+                                store.commitRename(s.id, to: name)
+                            } onCancel: {
+                                store.cancelRename()
+                            }
+                            .frame(maxWidth: 320)
+                            .id(s.id)
+                        } else {
+                            Text(s.name)
+                                .font(TFFont.toolbarTitle)
+                                .lineLimit(1)
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) { store.beginRename(s.id, inHeader: true) }
+                                .help("Double-click to rename")
+                                .accessibilityAction(named: "Rename") { store.beginRename(s.id, inHeader: true) }
+                        }
                         // The session's group, right after its name (archived sessions too).
                         if let g = store.group(s.groupId) {
                             GroupChip(group: g, sessionId: s.id)
