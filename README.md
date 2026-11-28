@@ -16,7 +16,7 @@ the list tidy with search, rename and archive.
 - **Live status from Claude Code's hooks.** Working, Needs you, Your turn, Ended: in the sidebar and the header.
 - **Notifications and a Dock badge** when a session you're not looking at finishes or needs an answer.
 - **Model and effort** of the last answer in the header, e.g. *Opus 5.5 · High effort*.
-- **Session Info** (⌘I, or right-click a session): model and effort, when it started, active time, and token use (input, output, cache read, subagents included).
+- **Session Info** (right-click a session, or Session › Session Info): model and effort, when it started, active time, and token use (input, output, cache read, subagents included).
 - **Branch switcher** in the toolbar: see the session folder's git branch and uncommitted changes, search local and remote branches, switch, or create a new branch.
 - **New session sheet** (⌘T): open a project folder, start a blank session, or reopen one of your recent projects with ⌘1–⌘9.
 - **Session groups:** sort sessions into named, coloured groups. Collapse a group and a dot still tells you when a session in it needs you. Drag sessions between groups, reorder them, or drag groups to reorder; start a new session straight into a group from its menu.
@@ -49,7 +49,6 @@ You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed an
 | ⌘1 … ⌘9 | Select a session (or open a recent project in the New session sheet) |
 | ⇧⌘] / ⇧⌘[ | Next / previous session |
 | ⌘R | Rename |
-| ⌘I | Session Info |
 | ⇧⌘A | Archive / unarchive |
 | ⇧⌘E | Export session as Markdown |
 | ⌘+ / ⌘− / ⌘0 | Terminal font size |

@@ -32,7 +32,6 @@ struct AppCommands: Commands {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(s == nil)
             Button("Session Info") { store.toggleSessionInfo() }
-                .keyboardShortcut("i", modifiers: .command)
                 .disabled(s == nil)
             Button(s?.isArchived == true ? "Unarchive" : "Archive") { store.toggleArchive() }
                 .keyboardShortcut("a", modifiers: [.command, .shift])

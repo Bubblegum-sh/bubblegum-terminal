@@ -261,9 +261,7 @@ struct SessionMenuItems: View {
         Button(role: .destructive) { store.requestDelete(session.id) } label: { Label("Delete Session…", systemImage: "trash") }
     }
 
-    /// Shows ⌘I in the menu; the shortcut itself is the menu bar's Session › Session Info.
     private var sessionInfo: some View {
         Button { store.toggleSessionInfo(session.id) } label: { Label("Session Info", systemImage: "info.circle") }
-            .keyboardShortcut("i", modifiers: .command)
     }
 }

@@ -399,7 +399,7 @@ final class SessionStore: ObservableObject {
 
     // MARK: Session Info
 
-    /// ⌘I or the session menu: opens Session Info for the session (the selected one by
+    /// The session menu or Session › Session Info: opens Session Info for the session (the selected one by
     /// default), anchored to its row; asking again for the same session closes it.
     func toggleSessionInfo(_ id: UUID? = nil) {
         guard let id = id ?? selectedId, session(id) != nil else { return }
